@@ -6,6 +6,8 @@
 // KV 绑定：
 //   RATE_LIMIT_KV —— 用于滥用检测（永久封禁名单 + 请求计数）
 
+import { bumpStat, addTokens } from '../_stats.js';
+
 const MAX_BODY_BYTES = 32 * 1024;      // 请求体上限（32KB）
 const MAX_CONTEXT_MESSAGES = 20;       // 发给模型的最大历史消息数
 const MAX_PER_MINUTE = 20;             // 同一 IP 每分钟超过该次数 -> 永久封禁
@@ -79,6 +81,13 @@ export async function onRequestPost(context) {
     }
 
     const data = await upstream.json().catch(() => ({}));
+
+    // 统计：AI 请求次数 + Token 用量
+    await bumpStat(env, 'chatRequests');
+    if (upstream.ok && data && data.usage) {
+        await addTokens(env, data.usage.prompt_tokens, data.usage.completion_tokens);
+    }
+
     if (!upstream.ok) {
         // 不透出上游错误细节，避免泄露内部信息
         return json({ error: 'AI service error.' }, 502);

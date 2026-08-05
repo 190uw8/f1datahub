@@ -5,6 +5,8 @@
 //
 // KV 绑定：KV
 
+import { bumpStat } from '../_stats.js';
+
 const CACHE_TTL_SECONDS = 600; // 缓存 10 分钟
 
 export async function onRequestGet(context) {
@@ -16,6 +18,9 @@ export async function onRequestGet(context) {
     if (path.includes('..') || path.includes('//')) return json({ error: 'Bad request' }, 400);
 
     const cacheKey = `f1:${path}${url.search}`;
+
+    // 统计：数据代理请求次数
+    await bumpStat(env, 'apiRequests');
 
     // 1) 命中缓存直接返回
     const cached = await env.KV.get(cacheKey);

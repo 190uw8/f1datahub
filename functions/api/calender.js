@@ -3,6 +3,8 @@
 // KV 绑定：
 //   KV —— 存放赛程覆盖数据（calendar_<year>，由 admin.js / 后台写入）
 
+import { bumpStat } from '../_stats.js';
+
 export async function onRequestGet(context) {
     const url = new URL(context.request.url);
     const year = url.searchParams.get('year') || '2026';
@@ -14,6 +16,9 @@ export async function onRequestGet(context) {
             headers: { 'Content-Type': 'application/json' }
         });
     }
+
+    // 统计：赛程接口请求次数
+    await bumpStat(context.env, 'apiRequests');
 
     try {
         // 1. 获取官方数据

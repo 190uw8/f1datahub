@@ -3,64 +3,73 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>F1 Data Hub - 后台管理</title>
+<title>F1 Data Hub 后台</title>
 <style>
     :root {
-        --f1-red: #ff1801;
-        --accent-blue: #00f0ff;
-        --bg: #0a0a0f;
-        --card: rgba(20, 20, 28, 0.85);
-        --panel: rgba(13, 13, 20, 0.98);
-        --text: #ffffff;
-        --muted: #9ca3af;
-        --green: #4ade80;
+        --bg: #f3f5f9;
+        --card: #ffffff;
+        --line: #e3e7ef;
+        --text: #1a2233;
+        --muted: #6b7688;
+        --primary: #2563eb;
+        --green: #16a34a;
+        --red: #dc2626;
     }
     * { box-sizing: border-box; }
     body {
         margin: 0; padding: 1.5rem;
-        font-family: 'Rajdhani', 'Segoe UI', Arial, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
         background: var(--bg); color: var(--text); line-height: 1.5;
     }
-    h1 { font-family: 'Orbitron', 'Rajdhani', sans-serif; font-size: 1.4rem; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
-    h2 { font-family: 'Orbitron', 'Rajdhani', sans-serif; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid var(--f1-red); padding-bottom: 0.3rem; margin: 0 0 1rem; }
-    .view { max-width: 1000px; margin: 0 auto; }
+    .view { max-width: 1080px; margin: 0 auto; }
     .hidden { display: none !important; }
-    .card { background: var(--card); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 1.2rem; margin-bottom: 1.2rem; }
-    .center { max-width: 420px; margin: 8vh auto; text-align: center; }
-    input, select {
-        width: 100%; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.9rem;
-        background: #161622; border: 1px solid #333; border-radius: 4px;
-        color: var(--text); font-size: 1rem; font-family: inherit;
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1.1rem 1.2rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(16,24,40,0.05); }
+    h1 { font-size: 1.25rem; margin: 0; }
+    h2 { font-size: 1rem; margin: 0 0 0.8rem; color: var(--text); }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    nav { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
+    nav button {
+        background: var(--card); color: var(--text); border: 1px solid var(--line);
+        padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.9rem; cursor: pointer; font-weight: 600;
     }
-    input:focus { border-color: var(--accent-blue); outline: none; }
-    input[type="checkbox"] { width: auto; margin-right: 0.4rem; }
+    nav button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
     button {
-        background: var(--f1-red); color: #fff; border: none; border-radius: 4px;
-        padding: 0.6rem 1.2rem; font-size: 0.95rem; font-weight: 700;
-        cursor: pointer; font-family: inherit; text-transform: uppercase; letter-spacing: 1px;
+        background: var(--primary); color: #fff; border: none; border-radius: 8px;
+        padding: 0.55rem 1.1rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit;
     }
-    button:hover { background: #cc1400; }
-    button.secondary { background: #1d1d2a; border: 1px solid #444; }
-    button.secondary:hover { background: #2a2a3a; }
-    button.danger { background: transparent; border: 1px solid var(--f1-red); color: var(--f1-red); padding: 0.35rem 0.7rem; font-size: 0.8rem; }
-    button.danger:hover { background: var(--f1-red); color: #fff; }
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; }
-    nav { display: flex; gap: 0.5rem; margin-bottom: 1.2rem; }
-    nav button { background: #1d1d2a; border: 1px solid #444; }
-    nav button.active { background: var(--f1-red); border-color: var(--f1-red); }
+    button:hover { filter: brightness(1.08); }
+    button.secondary { background: #eef1f6; color: var(--text); border: 1px solid var(--line); }
+    button.danger { background: transparent; color: var(--red); border: 1px solid var(--red); padding: 0.3rem 0.7rem; font-size: 0.8rem; border-radius: 6px; }
+    input {
+        width: 100%; padding: 0.55rem 0.75rem; margin: 0.25rem 0 0.8rem;
+        border: 1px solid var(--line); border-radius: 8px; font-size: 0.95rem; font-family: inherit;
+    }
+    input:focus { border-color: var(--primary); outline: none; }
+    input[type="checkbox"] { width: auto; margin-right: 0.4rem; }
+    label { font-size: 0.8rem; color: var(--muted); display: block; margin-top: 0.2rem; }
     .toolbar { display: flex; gap: 0.6rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem; }
-    .toolbar label { font-size: 0.75rem; color: var(--accent-blue); text-transform: uppercase; letter-spacing: 1px; }
+    .toolbar label { margin: 0; }
     .toolbar input { width: 120px; margin: 0.2rem 0 0; }
-    .toolbar button { margin: 0; padding: 0.55rem 1rem; }
-    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.6rem 1rem; align-items: end; }
-    .form-grid label { font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
-    th, td { padding: 0.55rem 0.6rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); }
-    th { font-family: 'Orbitron', 'Rajdhani', sans-serif; color: var(--f1-red); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; }
-    .status { margin-top: 0.8rem; font-weight: 700; min-height: 1.2em; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.4rem 1rem; align-items: end; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { padding: 0.5rem 0.6rem; text-align: left; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; font-size: 0.78rem; }
+    .status { margin-top: 0.7rem; font-weight: 600; min-height: 1.2em; font-size: 0.9rem; }
     .ok { color: var(--green); }
-    .err { color: var(--f1-red); }
-    .count { color: var(--accent-blue); font-size: 0.8rem; }
+    .err { color: var(--red); }
+    .center { max-width: 380px; margin: 10vh auto; text-align: center; }
+
+    /* 统计卡片 */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.8rem; margin-bottom: 1rem; }
+    .stat-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem 1rem; box-shadow: 0 1px 3px rgba(16,24,40,0.05); }
+    .stat-card .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 0.2rem; }
+    .stat-card .value.small { font-size: 1.05rem; }
+    .stat-card.blue .value { color: var(--primary); }
+    .stat-card.green .value { color: var(--green); }
+    .stat-card.red .value { color: var(--red); }
+    .bar { background: #eef1f6; border-radius: 5px; height: 10px; width: 100px; overflow: hidden; }
+    .bar-fill { background: var(--primary); height: 100%; border-radius: 5px; min-width: 2px; }
 </style>
 </head>
 <body>
@@ -82,33 +91,54 @@
     </header>
 
     <nav>
-        <button class="tab active" onclick="showTab('races')">赛程覆盖</button>
-        <button class="tab" onclick="showTab('bans')">IP 封禁</button>
+        <button class="tab active" data-tab="stats" onclick="showTab('stats')">数据统计</button>
+        <button class="tab" data-tab="races" onclick="showTab('races')">赛程覆盖</button>
+        <button class="tab" data-tab="bans" onclick="showTab('bans')">IP 封禁</button>
     </nav>
 
-    <section id="tab-races">
+    <section id="tab-stats">
+        <div class="cards">
+            <div class="stat-card blue"><div class="label">今日访问</div><div class="value" id="stVisits">-</div></div>
+            <div class="stat-card blue"><div class="label">今日 API 请求</div><div class="value" id="stApi">-</div></div>
+            <div class="stat-card blue"><div class="label">今日 AI 请求</div><div class="value" id="stChat">-</div></div>
+            <div class="stat-card green"><div class="label">今日 Tokens</div><div class="value" id="stTokens">-</div></div>
+        </div>
+        <div class="cards">
+            <div class="stat-card"><div class="label">今日输入 Tokens</div><div class="value small" id="stPrompt">-</div></div>
+            <div class="stat-card"><div class="label">今日输出 Tokens</div><div class="value small" id="stCompletion">-</div></div>
+            <div class="stat-card red"><div class="label">近 14 天访问</div><div class="value small" id="stVisits14">-</div></div>
+            <div class="stat-card red"><div class="label">近 14 天 AI 请求</div><div class="value small" id="stChat14">-</div></div>
+        </div>
+        <div class="card">
+            <h2>近 14 天趋势</h2>
+            <table>
+                <thead><tr><th>日期</th><th>访问</th><th>API</th><th>AI</th><th>Tokens</th><th>访问趋势</th></tr></thead>
+                <tbody id="statsTableBody"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="tab-races" class="hidden">
         <div class="toolbar">
             <label>赛季年份
                 <input type="text" id="year" value="2026">
             </label>
             <button onclick="loadRaces()">加载赛程</button>
         </div>
-
         <div class="card">
-            <h2>添加 / 修改覆盖 <span class="count" id="raceCount"></span></h2>
+            <h2>添加 / 修改覆盖 <span id="raceCount"></span></h2>
             <div class="form-grid">
                 <label>回合数<input type="text" id="round" placeholder="如 16"></label>
                 <label>比赛名称<input type="text" id="raceName" placeholder="如 Sepang GP"></label>
                 <label>赛道 ID<input type="text" id="circuitId" placeholder="如 sepang"></label>
                 <label>赛道显示名称<input type="text" id="circuitName" placeholder="如 Sepang International Circuit"></label>
                 <label>比赛日期<input type="date" id="date"></label>
-                <label><input type="checkbox" id="hasSprint"> 包含冲刺赛</label>
+                <label style="display:flex; align-items:center; margin-top:0.4rem;"><input type="checkbox" id="hasSprint"> 包含冲刺赛</label>
             </div>
             <button onclick="saveRace()">保存覆盖</button>
             <button class="secondary" onclick="clearForm()">清空表单</button>
             <div class="status" id="raceStatus"></div>
         </div>
-
         <div class="card">
             <h2>已保存的覆盖</h2>
             <table>
@@ -144,8 +174,7 @@ function showLogin() {
 function showMain() {
     document.getElementById('loginView').classList.add('hidden');
     document.getElementById('mainView').classList.remove('hidden');
-    loadRaces().catch(() => {});
-    loadBans().catch(() => {});
+    loadStats().catch(() => {});
 }
 
 function logout() {
@@ -191,15 +220,66 @@ async function login() {
 }
 
 function showTab(name) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.textContent.includes(name === 'races' ? '赛程' : 'IP')));
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    document.getElementById('tab-stats').classList.toggle('hidden', name !== 'stats');
     document.getElementById('tab-races').classList.toggle('hidden', name !== 'races');
     document.getElementById('tab-bans').classList.toggle('hidden', name !== 'bans');
+    if (name === 'stats') loadStats().catch(() => {});
+    if (name === 'races') loadRaces().catch(() => {});
+    if (name === 'bans') loadBans().catch(() => {});
 }
 
 function setStatus(id, msg, ok) {
     const el = document.getElementById(id);
     el.className = 'status ' + (ok ? 'ok' : 'err');
     el.textContent = (ok ? '✅ ' : '❌ ') + msg;
+}
+
+function setText(id, v) {
+    document.getElementById(id).textContent = v;
+}
+
+function fmt(n) {
+    return Number(n || 0).toLocaleString('en-US');
+}
+
+async function loadStats() {
+    const data = await api('/api/stats');
+    const t = data.today || {};
+    const totals = data.totals || {};
+    setText('stVisits', fmt(t.visits));
+    setText('stApi', fmt(t.apiRequests));
+    setText('stChat', fmt(t.chatRequests));
+    setText('stTokens', fmt(t.totalTokens));
+    setText('stPrompt', fmt(t.promptTokens));
+    setText('stCompletion', fmt(t.completionTokens));
+    setText('stVisits14', fmt(totals.visits));
+    setText('stChat14', fmt(totals.chatRequests));
+    renderStatsTable(data.days || []);
+}
+
+function renderStatsTable(days) {
+    const tbody = document.getElementById('statsTableBody');
+    tbody.innerHTML = '';
+    const maxVisits = Math.max(1, ...days.map(d => d.visits || 0));
+    days.forEach(d => {
+        const tr = document.createElement('tr');
+        [d.date, fmt(d.visits), fmt(d.apiRequests), fmt(d.chatRequests), fmt(d.totalTokens)].forEach(v => {
+            const td = document.createElement('td');
+            td.textContent = v;
+            tr.appendChild(td);
+        });
+        const barTd = document.createElement('td');
+        const wrap = document.createElement('div');
+        wrap.className = 'bar';
+        const fill = document.createElement('div');
+        fill.className = 'bar-fill';
+        fill.style.width = Math.round(((d.visits || 0) / maxVisits) * 100) + '%';
+        wrap.appendChild(fill);
+        barTd.appendChild(wrap);
+        tr.appendChild(barTd);
+        tbody.appendChild(tr);
+    });
 }
 
 async function loadRaces() {
@@ -234,7 +314,6 @@ async function loadRaces() {
 }
 
 function fillForm(r) {
-    document.getElementById('year').value = document.getElementById('year').value || String(new Date().getFullYear());
     document.getElementById('round').value = r.round;
     document.getElementById('raceName').value = r.raceName || '';
     document.getElementById('circuitId').value = (r.Circuit && r.Circuit.circuitId) || '';

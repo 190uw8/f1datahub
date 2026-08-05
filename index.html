@@ -1353,5 +1353,8 @@
     mqTablet.addEventListener('change', classify);
 })();
 </script>
+<script>
+fetch('/api/stats', { method: 'POST', keepalive: true }).catch(function () {});
+</script>
 </body>
 </html>
