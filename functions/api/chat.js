@@ -48,6 +48,16 @@ const MAX_PER_MINUTE = 10;             // 同一 IP 每分钟超过该次数 -> 
 const MAX_PER_10_SEC = 8;              // 同一 IP 每 10 秒超过该次数 -> 永久封禁
 
 export async function onRequestPost(context) {
+    try {
+        return await handleChatRequest(context);
+    } catch (err) {
+        console.error('chat.js unhandled error:', err);
+        // 任何未预期异常都返回 JSON，避免客户端收到 Cloudflare 的非 JSON 500
+        return json({ error: 'Internal server error.' }, 500);
+    }
+}
+
+async function handleChatRequest(context) {
     const { request, env } = context;
 
     // 1) 滥用检测：高频访问 -> 永久封禁该 IP 的 AI 使用权
@@ -167,36 +177,46 @@ async function checkAndMaybeBan(env, request) {
     const ip = clientIp(request);
     info.ip = ip;
 
-    // 读取时绕过边缘缓存，尽量拿到最新计数（KV 默认会缓存 60 秒，
-    // 之前高频请求可能一直读到旧值，导致永远不超阈值）
-    const get = key => kv.get(key, { cacheTtl: 0 });
+    try {
+        // 读取计数。注意：cacheTtl 最小合法值是 30 秒，传 0 会抛异常导致整个接口 500。
+        // 用 30 时读到的计数最多滞后约 30 秒，对防滥用来说足够。
+        const get = key => kv.get(key, { type: 'text', cacheTtl: 30 });
 
-    const now = Date.now();
-    const minuteKey = Math.floor(now / 60000);
-    const spikeKey = Math.floor(now / 10000); // 10 秒窗口
+        const now = Date.now();
+        const minuteKey = Math.floor(now / 60000);
+        const spikeKey = Math.floor(now / 10000); // 10 秒窗口
 
-    // 在永久封禁名单里 -> 直接 403
-    if (await get(`ban:${ip}`)) {
-        info.banned = true;
-        return { blocked: true, response: json({ error: 'Access blocked due to excessive API usage.' }, 403, rateHeaders(info)) };
+        // 在永久封禁名单里 -> 直接 403
+        if (await get(`ban:${ip}`)) {
+            info.banned = true;
+            return { blocked: true, response: json({ error: 'Access blocked due to excessive API usage.' }, 403, rateHeaders(info)) };
+        }
+
+        const minuteCount = parseInt((await get(`count:${ip}:${minuteKey}`)) || '0', 10) + 1;
+        const spikeCount = parseInt((await get(`spike:${ip}:${spikeKey}`)) || '0', 10) + 1;
+        info.minuteCount = minuteCount;
+        info.spikeCount = spikeCount;
+
+        // 超阈值 -> 写入永久封禁（不设 TTL，保留到手动解除）
+        if (minuteCount > MAX_PER_MINUTE || spikeCount > MAX_PER_10_SEC) {
+            await kv.put(`ban:${ip}`, String(now));
+            info.banned = true;
+            return { blocked: true, response: json({ error: 'Access blocked due to excessive API usage.' }, 403, rateHeaders(info)) };
+        }
+
+        // 写计数。expirationTtl 最小合法值是 60 秒；
+        // 同一 key 1 秒内最多写 1 次，超限会抛 429，这里捕获掉，限流出问题不影响聊天。
+        try {
+            await kv.put(`count:${ip}:${minuteKey}`, String(minuteCount), { expirationTtl: 120 });
+        } catch (e) {}
+        try {
+            await kv.put(`spike:${ip}:${spikeKey}`, String(spikeCount), { expirationTtl: 60 });
+        } catch (e) {}
+    } catch (err) {
+        // KV 读写异常时放行，保证聊天可用（限流尽力而为）
+        console.error('rate limit check failed:', err);
+        return { blocked: false, info };
     }
-
-    const minuteCount = parseInt((await get(`count:${ip}:${minuteKey}`)) || '0', 10) + 1;
-    const spikeCount = parseInt((await get(`spike:${ip}:${spikeKey}`)) || '0', 10) + 1;
-    info.minuteCount = minuteCount;
-    info.spikeCount = spikeCount;
-
-    // 超阈值 -> 写入永久封禁（不设 TTL，保留到手动解除）
-    if (minuteCount > MAX_PER_MINUTE || spikeCount > MAX_PER_10_SEC) {
-        await kv.put(`ban:${ip}`, String(now));
-        await kv.delete(`count:${ip}:${minuteKey}`).catch(() => {});
-        await kv.delete(`spike:${ip}:${spikeKey}`).catch(() => {});
-        info.banned = true;
-        return { blocked: true, response: json({ error: 'Access blocked due to excessive API usage.' }, 403, rateHeaders(info)) };
-    }
-
-    await kv.put(`count:${ip}:${minuteKey}`, String(minuteCount), { expirationTtl: 120 });
-    await kv.put(`spike:${ip}:${spikeKey}`, String(spikeCount), { expirationTtl: 40 });
 
     return { blocked: false, info };
 }
