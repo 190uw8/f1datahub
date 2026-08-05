@@ -50,6 +50,8 @@ function localFallbackReply(text) {
 
 function handleFailure(msgBox, errMsg) {
     console.error(errMsg);
+    // 先把真实错误以小字灰/红提示显示，方便排查（被封禁、服务未配置等）
+    msgBox.innerHTML += `<div class="chat-msg system-err">${escapeHTML(errMsg)}</div>`;
     if (AI_LOCAL_FALLBACK) {
         const lastUserMsg = chatHistory[chatHistory.length - 1]?.content || '';
         const localReply = localFallbackReply(lastUserMsg);
