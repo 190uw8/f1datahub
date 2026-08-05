@@ -5,7 +5,22 @@
 //
 // KV 绑定：KV
 
-import { bumpStat, dayKey } from '../_stats.js';
+// ---- 统计辅助（内联，避免 Pages 把共享文件当路由编译）----
+function dayKey(d) {
+    const date = d || new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+async function bumpStat(env, field) {
+    if (!env || !env.KV) return;
+    try {
+        const key = `stats:day:${dayKey()}`;
+        let s = {};
+        try { s = JSON.parse((await env.KV.get(key)) || '{}'); } catch (e) {}
+        s[field] = (s[field] || 0) + 1;
+        await env.KV.put(key, JSON.stringify(s), { expirationTtl: 45 * 86400 });
+    } catch (e) {}
+}
 
 export async function onRequestGet(context) {
     if (!(await verifyToken(context.env, context.request))) {
