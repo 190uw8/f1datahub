@@ -1354,7 +1354,13 @@
 })();
 </script>
 <script>
-fetch('/api/stats', { method: 'POST', keepalive: true }).catch(function () {});
+try {
+    if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/stats', new Blob([], { type: 'application/json' }));
+    } else {
+        fetch('/api/stats', { method: 'POST', keepalive: true }).catch(function () {});
+    }
+} catch (e) {}
 </script>
 </body>
 </html>
