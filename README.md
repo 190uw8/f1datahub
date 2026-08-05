@@ -136,7 +136,7 @@ Visit `/dashboard.html` and log in with `ADMIN_PASSWORD`.
 
 1. **数据仅供参考**：站内所有比赛数据均来自第三方公开数据源（api.jolpi.ca），可能存在延迟、遗漏或错误，不保证数据的完整性、准确性与实时性。
 2. **AI 回答不构成专业建议**：AI 助手生成的内容基于模型训练数据，可能包含错误或过时信息，请勿将其作为决策依据。因使用本网站内容造成的任何直接或间接损失，本站不承担责任。
-3. **知识产权**：本站引用的车队名称、商标、Logo 等均归其各自所有者所有，仅用于识别与展示目的。
+3. **知识产权**：本站引用的车队名称、商标等均归其各自所有者所有，仅用于识别与展示目的。
 4. **使用风险自负**：访问和使用本网站即表示您同意自行承担相关风险。
 
 *This site is provided "as is" without warranties of any kind, express or implied. Use at your own risk.*
