@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Data Hub</title>
+    <!-- Favicon Integration -->
+    <link rel="icon" type="image/png" href="f1.png">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Marked.js for Obsidian-style Markdown formatting -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.13/dist/purify.min.js" integrity="sha384-ZuC+DIACqSIZTsp+7YF57cR5Y+6qXa7YFbEKdA/EHA/R0T+41dtorqucYl71Zp+t" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@18.0.7/lib/marked.umd.min.js" integrity="sha384-fLcv0/sXzwqIpE+6a2K1pEC+pwVu+cXnn/f4xW4/1Pfea5RBO2PV57uEnG2KwuCF" crossorigin="anonymous"></script>
+    
+    <style>
+        :root {
+            --f1-red: #ff1801;
+            --dark-bg: #0a0a0f;
+            --card-bg: rgba(20, 20, 28, 0.85);
+            --panel-bg: rgba(13, 13, 20, 0.98);
+            --text-main: #ffffff;
+            --text-muted: #9ca3af;
+            --accent-blue: #00f0ff;
+            --status-done: #4ade80;
+            --status-upcoming: #facc15;
+            --constructor-gold: #fbbf24;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Rajdhani', sans-serif;
+            background-color: var(--dark-bg);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(255, 24, 1, 0.05), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(0, 240, 255, 0.05), transparent 25%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            line-height: 1.5;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: var(--f1-red); border-radius: 3px; }
+
+        /* --- BOOT SCREEN STYLES --- */
+        #bootScreen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 9999; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; transition: opacity 0.8s ease;
+        }
+        .boot-logo { height: 80px; margin-bottom: 20px; animation: pulse 2s infinite; }
+        .boot-title { font-family: 'Orbitron', sans-serif; font-size: 2.5rem; color: #fff; text-transform: uppercase; letter-spacing: 4px; margin: 0 0 10px 0; }
+        .boot-status { font-family: 'Orbitron', sans-serif; font-size: 0.9rem; color: var(--accent-blue); letter-spacing: 2px; margin-bottom: 30px; text-transform: uppercase; }
+        .progress-bar-container { width: 300px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+        .progress-bar { width: 0%; height: 100%; background: var(--f1-red); transition: width 0.4s ease; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        /* --- MAIN UI STYLES --- */
+        #mainApp { opacity: 0; transition: opacity 0.8s ease; display: none; }
+
+        header {
+            background: linear-gradient(135deg, #111, #000);
+            padding: 2rem 1rem; text-align: center;
+            border-bottom: 3px solid var(--f1-red);
+            box-shadow: 0 5px 25px rgba(255, 24, 1, 0.2);
+            position: relative;
+        }
+
+        header::before {
+            content: 'API CONNECTION ACTIVE';
+            position: absolute; top: 10px; left: 20px;
+            font-family: 'Orbitron', sans-serif; color: var(--status-done);
+            font-size: 0.75rem; letter-spacing: 1px; animation: blink 2s infinite;
+        }
+
+        .api-loading {
+            position: absolute; top: 10px; right: 20px;
+            font-family: 'Orbitron', sans-serif; color: var(--accent-blue);
+            font-size: 0.75rem; letter-spacing: 1px; display: none;
+        }
+
+        .header-brand { display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .header-logo { height: 45px; object-fit: contain; }
+
+        header h1 {
+            font-family: 'Orbitron', sans-serif; margin: 0; font-size: 2.2rem;
+            text-transform: uppercase; font-weight: 900; letter-spacing: 3px;
+            background: linear-gradient(to right, #fff, #aaa);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            font-style: italic;
+        }
+
+        header p { margin: 0.2rem 0 0; font-size: 0.9rem; color: var(--f1-red); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+
+        .header-controls { margin-top: 1rem; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+        .season-selector-wrapper {
+            background: rgba(255,255,255,0.05); padding: 0.3rem 0.6rem;
+            border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .season-selector-wrapper label { font-family: 'Orbitron', sans-serif; font-size: 0.7rem; color: var(--accent-blue); margin-right: 6px; text-transform: uppercase; }
+        #seasonSelect {
+            background: var(--dark-bg); color: #fff;
+            border: 1px solid var(--accent-blue); padding: 0.2rem 0.4rem;
+            font-family: 'Orbitron', sans-serif; font-size: 0.85rem;
+            border-radius: 4px; cursor: pointer;
+        }
+
+        .search-wrapper { position: relative; width: 100%; max-width: 400px; }
+        #globalSearch {
+            width: 100%; padding: 0.6rem 1rem; border-radius: 20px;
+            background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(0, 240, 255, 0.4);
+            color: #fff; font-family: 'Rajdhani', sans-serif; font-size: 1rem;
+            box-sizing: border-box; transition: all 0.3s ease; outline: none;
+        }
+        #globalSearch:focus { border-color: var(--f1-red); box-shadow: 0 0 15px rgba(255, 24, 1, 0.3); }
+        #globalSearch::placeholder { color: rgba(255,255,255,0.4); font-family: 'Orbitron', sans-serif; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .search-results-dropdown {
+            position: absolute; top: 100%; left: 0; width: 100%;
+            background: var(--panel-bg); border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px; margin-top: 5px; max-height: 250px; overflow-y: auto;
+            z-index: 50; display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            text-align: left;
+        }
+        .search-result-item {
+            padding: 0.6rem 1rem; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex; justify-content: space-between; align-items: center; transition: background 0.2s;
+        }
+        .search-result-item:hover { background: rgba(0, 240, 255, 0.15); }
+        .search-result-name { font-weight: bold; font-size: 0.95rem; }
+        .search-result-type { font-family: 'Orbitron', sans-serif; font-size: 0.6rem; color: var(--accent-blue); text-transform: uppercase; }
+
+        .container { max-width: 1200px; margin: 1.2rem auto; padding: 0 1rem; }
+
+        h2 { font-family: 'Orbitron', sans-serif; font-size: 1.3rem; text-transform: uppercase; border-bottom: 2px solid var(--f1-red); padding-bottom: 0.3rem; margin-bottom: 0.8rem; margin-top: 1.5rem; }
+
+        .data-container { background: var(--card-bg); border-radius: 6px; padding: 0.4rem; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow-x: auto; }
+        .standings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1rem; }
+        .standings-grid {
+    max-width: 960px;          /* tables stop at a comfortable width */
+    margin-left: auto;
+    margin-right: auto;
+}
+        table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+        th, td { padding: 0.5rem 0.6rem; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.05); vertical-align: middle; }
+        th { font-family: 'Orbitron', sans-serif; color: var(--f1-red); text-transform: uppercase; font-size: 0.75rem; }
+
+        .clickable-row { cursor: pointer; transition: all 0.2s ease; }
+        .clickable-row:hover { background-color: rgba(0, 240, 255, 0.08); }
+        
+        .driver-link { cursor: pointer; transition: color 0.2s ease; display: inline-block; }
+        .driver-link:hover { color: var(--accent-blue); text-decoration: underline; }
+
+        .sprint-badge { background: var(--accent-blue); color: #000; font-size: 0.6rem; padding: 1px 4px; border-radius: 3px; margin-left: 5px; font-weight: bold; vertical-align: middle; }
+
+        .panel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px); z-index: 999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .panel-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .telemetry-panel { position: fixed; top: 0; right: -100%; width: 100%; max-width: 500px; height: 100%; background: var(--panel-bg); border-left: 4px solid var(--accent-blue); box-shadow: -10px 0 40px rgba(0, 0, 0, 0.8); z-index: 1000; transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); overflow-y: auto; padding: 1.2rem; box-sizing: border-box; display: flex; flex-direction: column; }
+        .telemetry-panel.active { right: 0; }
+
+        .side-panel-left { position: fixed; top: 0; left: -100%; width: 100%; max-width: 450px; height: 100%; background: var(--panel-bg); border-right: 4px solid var(--f1-red); box-shadow: 10px 0 40px rgba(0, 0, 0, 0.8); z-index: 1001; transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1); overflow-y: auto; padding: 1.2rem; box-sizing: border-box; display: flex; flex-direction: column; }
+        .side-panel-left.active { left: 0; }
+        .side-panel-left.constructor-mode { border-right-color: var(--constructor-gold); }
+        .side-panel-left.track-mode { border-right-color: var(--status-done); }
+
+        .close-btn { background: transparent; border: 2px solid var(--f1-red); color: var(--f1-red); font-family: 'Orbitron', sans-serif; font-weight: 700; padding: 0.2rem 0.6rem; cursor: pointer; text-transform: uppercase; transition: all 0.2s ease; align-self: flex-end; margin-bottom: 0.4rem; font-size: 0.75rem; }
+        .close-btn:hover { background: var(--f1-red); color: #fff; }
+        .side-panel-left.constructor-mode .close-btn { border-color: var(--constructor-gold); color: var(--constructor-gold); }
+        .side-panel-left.constructor-mode .close-btn:hover { background: var(--constructor-gold); color: #000; }
+        .side-panel-left.track-mode .close-btn { border-color: var(--status-done); color: var(--status-done); }
+        .side-panel-left.track-mode .close-btn:hover { background: var(--status-done); color: #000; }
+
+        .panel-header h3 { font-family: 'Orbitron', sans-serif; font-size: 1.4rem; margin: 0; text-transform: uppercase; color: #fff; }
+        .panel-header p { color: var(--accent-blue); margin: 0.2rem 0 0.8rem 0; font-family: 'Orbitron', sans-serif; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; }
+
+        .session-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .session-tab { background: rgba(255,255,255,0.06); border: 1px solid rgba(0, 240, 255, 0.4); color: #fff; padding: 0.35rem 0.6rem; font-family: 'Orbitron', sans-serif; font-size: 0.65rem; cursor: pointer; text-transform: uppercase; border-radius: 3px; transition: all 0.2s ease; display: inline-block; }
+        .session-tab:hover { background: rgba(0, 240, 255, 0.2); border-color: var(--accent-blue); }
+        .session-tab.active { background: var(--accent-blue); color: #000; font-weight: 900; border-color: var(--accent-blue); box-shadow: 0 0 8px rgba(0,240,255,0.4); }
+
+        #infoTab { border-color: rgba(74, 222, 128, 0.4); }
+        #infoTab:hover { background: rgba(74, 222, 128, 0.2); border-color: var(--status-done); }
+        #infoTab.active { background: var(--status-done); color: #000; border-color: var(--status-done); box-shadow: 0 0 8px rgba(74, 222, 128, 0.4); }
+
+        .section-title { font-family: 'Orbitron', sans-serif; text-transform: uppercase; color: var(--accent-blue); border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 0.2rem; margin: 0 0 0.4rem 0; font-size: 0.9rem; }
+        .compact-table-container { flex-grow: 1; overflow-y: auto; max-height: calc(100vh - 200px); }
+        .mini-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .mini-table th { color: var(--text-muted); padding: 0.3rem 0.4rem; border-bottom: 1px solid #333; position: sticky; top: 0; background: var(--panel-bg); z-index: 2; font-size: 0.7rem; }
+        .mini-table td { padding: 0.3rem 0.4rem; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .mini-table tr:hover { background: rgba(255,255,255,0.05); }
+        
+        .pos-num { font-family: 'Orbitron', sans-serif; font-weight: 700; color: #fff; width: 25px; }
+        .driver-name { font-weight: 700; font-size: 0.9rem; }
+        .driver-team { color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; }
+        
+        .team-border { border-left: 3px solid transparent; padding-left: 6px !important; }
+        .tbd-row { text-align: center; color: var(--text-muted); font-family: 'Orbitron', sans-serif; padding: 2rem !important; letter-spacing: 1px; text-transform: uppercase; font-size: 0.75rem; }
+
+        .history-content { padding: 0.5rem 0; color: var(--text-main); font-size: 0.95rem; line-height: 1.6; }
+        .history-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 4px; padding: 0.8rem; margin-bottom: 0.8rem; }
+        .history-card span { display: block; font-size: 0.7rem; color: var(--accent-blue); text-transform: uppercase; font-family: 'Orbitron', sans-serif; margin-bottom: 0.2rem; }
+        .history-card strong { font-size: 1.05rem; color: #fff; }
+
+        /* --- GLOBAL AI CHAT FLOATING WIDGET --- */
+        .ai-chat-trigger {
+            position: fixed; bottom: 25px; right: 25px; width: 60px; height: 60px;
+            background: var(--f1-red); border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 20px rgba(255, 24, 1, 0.6); cursor: pointer; z-index: 999;
+            border: 2px solid #fff; transition: transform 0.3s ease;
+        }
+        .ai-chat-trigger:hover { transform: scale(1.1) rotate(15deg); }
+        .ai-chat-trigger span { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 1.1rem; color: #fff; }
+
+        .ai-chat-window {
+            position: fixed; bottom: 95px; right: 25px; width: 380px; height: 500px;
+            background: var(--panel-bg); border: 2px solid var(--f1-red); border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 998; display: none;
+            flex-direction: column; overflow: hidden; font-family: 'Rajdhani', sans-serif;
+        }
+        .ai-chat-window.active { display: flex; }
+        .ai-chat-header {
+            background: linear-gradient(to right, #1a1a24, #0d0d14); padding: 0.8rem 1rem;
+            border-bottom: 1px solid rgba(255, 24, 1, 0.3); display: flex; justify-content: space-between; align-items: center;
+        }
+        .ai-chat-header h4 { font-family: 'Orbitron', sans-serif; margin: 0; color: #fff; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 1px; }
+        .ai-chat-header h4 span { color: var(--accent-blue); }
+        
+        .ai-messages-box { flex-grow: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.8rem; background: rgba(0,0,0,0.2); }
+        .chat-msg { max-width: 85%; padding: 0.5rem 0.8rem; border-radius: 6px; font-size: 0.95rem; line-height: 1.4; word-wrap: break-word; }
+        .chat-msg.user { background: rgba(0, 240, 255, 0.15); border: 1px solid var(--accent-blue); align-self: flex-end; color: #fff; }
+        .chat-msg.bot { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255,255,255,0.1); align-self: flex-start; color: #e1e1e6; }
+        
+        .chat-msg.bot p { margin: 0 0 0.5em 0; }
+        .chat-msg.bot p:last-child { margin-bottom: 0; }
+        .chat-msg.bot ul, .chat-msg.bot ol { margin: 0.5em 0; padding-left: 1.5em; }
+        .chat-msg.bot pre { background: rgba(0,0,0,0.4); padding: 0.5rem; border-radius: 4px; overflow-x: auto; }
+        .chat-msg.bot code { font-family: monospace; color: var(--accent-blue); }
+
+        .chat-msg.system-err { background: rgba(255, 24, 1, 0.15); border: 1px solid var(--f1-red); align-self: center; color: var(--f1-red); font-size: 0.85rem; font-family: 'Orbitron'; }
+
+        .ai-input-area { padding: 0.6rem; background: #0d0d14; border-top: 1px solid rgba(255,255,255,0.05); display: flex; gap: 8px; }
+        #aiQueryInput { flex-grow: 1; background: #161622; border: 1px solid #333; border-radius: 4px; padding: 0.5rem; color: #fff; font-family: 'Rajdhani', sans-serif; font-size: 0.95rem; outline: none; }
+        #aiQueryInput:focus { border-color: var(--accent-blue); }
+        .ai-send-btn { background: var(--f1-red); color: white; border: none; font-family: 'Orbitron'; font-weight: bold; font-size: 0.75rem; padding: 0 1rem; border-radius: 4px; cursor: pointer; text-transform: uppercase; }
+        .ai-send-btn:hover { background: #cc1400; }
+
+        footer { text-align: center; padding: 1.5rem; background: #050508; color: var(--text-muted); font-size: 0.8rem; margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); font-family: 'Orbitron', sans-serif; }
+    </style>
+    <style>
+/* --- TABLET: up to 1024px --- */
+@media (max-width: 1024px) {
+    .standings-grid { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); }
+    .telemetry-panel, .side-panel-left { max-width: 100%; }
+    .ai-chat-window { width: min(420px, calc(100vw - 40px)); }
+}
+
+/* --- PHONE: up to 768px --- */
+@media (max-width: 768px) {
+    header { padding: 1.2rem 0.8rem; }
+    header::before { top: 6px; left: 10px; font-size: 0.6rem; }
+    .api-loading { top: 6px; right: 10px; font-size: 0.6rem; }
+    header h1 { font-size: 1.35rem; letter-spacing: 1px; }
+    header p { font-size: 0.7rem; letter-spacing: 1px; }
+    .header-logo { height: 34px; }
+    .header-brand { gap: 10px; }
+
+    .boot-title { font-size: 1.6rem; letter-spacing: 2px; }
+    .boot-logo { height: 60px; }
+    .progress-bar-container { width: min(260px, 70vw); }
+
+    .container { padding: 0 0.6rem; margin: 0.8rem auto; }
+    h2 { font-size: 1.05rem; }
+    .standings-grid { grid-template-columns: 1fr; gap: 0.8rem; }
+
+    table { font-size: 0.82rem; }
+    th, td { padding: 0.4rem 0.4rem; }
+    .search-results-dropdown { max-height: 40vh; }
+
+    /* Profile & telemetry panels become full-screen sheets */
+    .telemetry-panel, .side-panel-left {
+        max-width: 100%; width: 100%; padding: 0.8rem;
+    }
+    .compact-table-container { max-height: none; }
+
+    /* AI chat becomes full-screen */
+    .ai-chat-trigger { bottom: 16px; right: 16px; width: 56px; height: 56px; }
+    .ai-chat-window {
+        top: 0; bottom: 0; right: 0; left: 0;
+        width: 100%; height: 100%;
+        border-radius: 0; border-width: 0; border-top: 2px solid var(--f1-red);
+    }
+    .ai-chat-header { padding: 0.7rem 0.8rem; }
+    .ai-messages-box { padding: 0.8rem; }
+    .chat-msg { max-width: 92%; font-size: 0.9rem; }
+
+    /* Keep inputs at 16px so iOS doesn't zoom on focus */
+    #aiQueryInput, #globalSearch, #seasonSelect { font-size: 16px; }
+
+    .session-tab { padding: 0.45rem 0.55rem; font-size: 0.62rem; }
+    footer { padding: 1rem; font-size: 0.7rem; }
+}
+</style>
+</head>
+<body>
+
+    <!-- BOOT SEQUENCE SCREEN -->
+    <div id="bootScreen">
+        <img src="f1.png" alt="F1 Logo" class="boot-logo" onerror="this.style.display='none'">
+        <h1 class="boot-title">F1 Data Core</h1>
+        <div class="boot-status" id="bootStatusText">INITIALIZING GLOBAL DATABASES...</div>
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="bootProgress"></div>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="mainApp">
+        <header>
+            <div class="header-brand">
+                <img src="f1.png" alt="F1 Logo" class="header-logo" onerror="this.style.display='none'">
+                <h1>F1 Data</h1>
+            </div>
+            <p>Live Database Feed</p>
+            <div class="api-loading" id="apiLoading">FETCHING DATA...</div>
+            
+            <div class="header-controls">
+                <div class="season-selector-wrapper">
+                    <label for="seasonSelect">Select Season:</label>
+                    <select id="seasonSelect"></select>
+                </div>
+                
+                <div class="search-wrapper">
+                    <input type="text" id="globalSearch" placeholder="Search Drivers, Teams or Circuits..." autocomplete="off">
+                    <div class="search-results-dropdown" id="searchResults"></div>
+                </div>
+            </div>
+        </header>
+
+        <div class="container">
+            <section>
+                <h2 id="calendarTitle">Season Calendar</h2>
+                <div class="data-container">
+                    <table id="calendarTable">
+                        <thead>
+                            <tr>
+                                <th>Rnd</th>
+                                <th>Grand Prix</th>
+                                <th>Circuit</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calendarBody">
+                            <tr><td colspan="4" class="tbd-row">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
+                <h2>World Championship Standings</h2>
+                <div class="standings-grid">
+                    <div class="data-container">
+                        <h4 class="section-title" style="margin-top: 0; color: #fff;">Drivers</h4>
+                        <table class="mini-table">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left;">Pos</th>
+                                    <th style="text-align: left;">Driver</th>
+                                    <th style="text-align: right;">Total Pts</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mainDriverStandingsBody">
+                                <tr><td colspan="3" class="tbd-row">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="data-container">
+                        <h4 class="section-title" style="margin-top: 0; color: #fff;">Constructors</h4>
+                        <table class="mini-table">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left;">Pos</th>
+                                    <th style="text-align: left;">Constructor</th>
+                                    <th style="text-align: right;">Total Pts</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mainConstructorStandingsBody">
+                                <tr><td colspan="3" class="tbd-row">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Overlays -->
+        <div class="panel-overlay" id="panelOverlay"></div>
+
+        <!-- Universal Left Sidebar -->
+        <div class="side-panel-left" id="leftSidebar">
+            <button class="close-btn" id="closeLeftSidebarBtn">Close [X]</button>
+            <div class="panel-header">
+                <h3 id="leftSidebarTitle">Profile</h3>
+                <p id="leftSidebarSubtitle">Statistics & Info</p>
+            </div>
+            <div class="compact-table-container">
+                <table class="mini-table">
+                    <tbody id="leftSidebarBody">
+                        <tr><td colspan="2" class="tbd-row">Select an entity</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Telemetry Sidebar (Right) -->
+        <div class="telemetry-panel" id="telemetryPanel">
+            <button class="close-btn" id="closePanelBtn">Close [X]</button>
+            
+            <div class="panel-header">
+                <h3 id="panelTitle">Grand Prix</h3>
+                <p id="panelSubtitle">Select a session below</p>
+            </div>
+
+            <div class="session-tabs" id="sessionTabs">
+                <button class="session-tab active" data-endpoint="results">Race</button>
+                <button class="session-tab" data-endpoint="qualifying">Qualifying</button>
+                <button class="session-tab" data-endpoint="sprint" id="sprintTab" style="display:none;">Sprint</button>
+                <button class="session-tab" data-endpoint="info" id="infoTab">Info</button>
+            </div>
+
+            <h4 class="section-title" id="sessionTableTitle">Race Results</h4>
+            <div class="compact-table-container" id="panelContentContainer">
+                <table class="mini-table" id="resultsTableElement">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left;">Pos</th>
+                            <th style="text-align: left;">Driver</th>
+                            <th style="text-align: right;" id="pointsColHeader">Points / Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="raceResultsBody">
+                        <!-- Injected via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- FLOATING AI CHAT WIDGET -->
+        <div class="ai-chat-trigger" onclick="toggleAIChat()">
+            <span>AI</span>
+        </div>
+        <div class="ai-chat-window" id="aiChatWindow">
+            <div class="ai-chat-header">
+                <h4>F1 <span>Strategic AI (BETA)</span></h4>
+                <button class="close-btn" style="margin:0; padding:2px 6px;" onclick="toggleAIChat()">X</button>
+            </div>
+            <div class="ai-messages-box" id="aiMessagesBox">
+                <div class="chat-msg bot">Hi! I am your F1 telemetry and strategy helper. Ask me anything about driver history, stats, or technical regulations! 🏎️</div>
+            </div>
+            <div class="ai-input-area">
+                <input type="text" id="aiQueryInput" placeholder="Ask AI Assistant..." onkeypress="handleChatKey(event)">
+                <button class="ai-send-btn" onclick="sendChatMessage()">Send</button>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; Personal Developer | Contact: contact@f1data.cc</p>
+        </footer>
+    </div>
+
+    <script>
+        const ERGAST_API_BASE = "/api/data"; 
+        
+        const loadingIndicator = document.getElementById('apiLoading');
+        
+        let currentSelectedYear = 2026;
+        let currentSelectedRound = null;
+        let activeRaceHasSprint = false;
+        let activeCircuitObj = null;
+
+        const memoryBuffer = { profiles: {}, tracks: {} };
+        function esc(v) {
+            return String(v ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function esq(v) {
+            return String(v ?? '')
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/&/g, '&amp;');
+        }
+        
+        let globalDriverIndex = [];
+        let globalConstructorIndex = [];
+        let globalCircuitIndex = [];
+        let aiChatHistory = [];
+
+        const teamColors = {
+            "Mercedes": "#00d2be", "Ferrari": "#e8002d", "Red Bull": "#3671c6",
+            "McLaren": "#ff8000", "Alpine": "#ff87bc", "RB": "#00293f",
+            "Haas": "#ffffff", "Williams": "#005aff", "Sauber": "#00e701",
+            "Aston Martin": "#229971", "Audi": "#f00000", "Cadillac": "#f4c430",
+            "Alfa Romeo": "#900000", "AlphaTauri": "#2b4562", "Renault": "#fff500",
+            "Brawn": "#cff753", "BMW Sauber": "#ffffff", "Toyota": "#eb0028"
+        };
+
+        const constructorHeritageMap = {
+            "aston_martin": "Jordan &rarr; Midland &rarr; Spyker &rarr; Force India &rarr; Racing Point &rarr; Aston Martin",
+            "racing_point": "Jordan &rarr; Midland &rarr; Spyker &rarr; Force India &rarr; Racing Point &rarr; Aston Martin",
+            "force_india": "Jordan &rarr; Midland &rarr; Spyker &rarr; Force India &rarr; Racing Point &rarr; Aston Martin",
+            "jordan": "Jordan &rarr; Midland &rarr; Spyker &rarr; Force India &rarr; Racing Point &rarr; Aston Martin",
+            "mercedes": "Tyrrell &rarr; BAR &rarr; Honda &rarr; Brawn &rarr; Mercedes",
+            "brawn": "Tyrrell &rarr; BAR &rarr; Honda &rarr; Brawn &rarr; Mercedes",
+            "honda": "Tyrrell &rarr; BAR &rarr; Honda &rarr; Brawn &rarr; Mercedes",
+            "tyrrell": "Tyrrell &rarr; BAR &rarr; Honda &rarr; Brawn &rarr; Mercedes",
+            "red_bull": "Stewart &rarr; Jaguar &rarr; Red Bull Racing",
+            "jaguar": "Stewart &rarr; Jaguar &rarr; Red Bull Racing",
+            "stewart": "Stewart &rarr; Jaguar &rarr; Red Bull Racing",
+            "alpine": "Toleman &rarr; Benetton &rarr; Renault &rarr; Lotus &rarr; Renault &rarr; Alpine",
+            "renault": "Toleman &rarr; Benetton &rarr; Renault &rarr; Lotus &rarr; Renault &rarr; Alpine",
+            "benetton": "Toleman &rarr; Benetton &rarr; Renault &rarr; Lotus &rarr; Renault &rarr; Alpine",
+            "sauber": "Sauber &rarr; BMW Sauber &rarr; Sauber &rarr; Alfa Romeo &rarr; Sauber (Stake)",
+            "alfa": "Sauber &rarr; BMW Sauber &rarr; Sauber &rarr; Alfa Romeo &rarr; Sauber (Stake)",
+            "bmw_sauber": "Sauber &rarr; BMW Sauber &rarr; Sauber &rarr; Alfa Romeo &rarr; Sauber (Stake)",
+            "rb": "Minardi &rarr; Toro Rosso &rarr; AlphaTauri &rarr; RB",
+            "alphatauri": "Minardi &rarr; Toro Rosso &rarr; AlphaTauri &rarr; RB",
+            "toro_rosso": "Minardi &rarr; Toro Rosso &rarr; AlphaTauri &rarr; RB",
+            "minardi": "Minardi &rarr; Toro Rosso &rarr; AlphaTauri &rarr; RB"
+        };
+
+        async function fetchAllData(endpoint) {
+            let offset = 0;
+            let allData = [];
+            while (true) {
+                const baseUrl = "/api/data";
+                const url = endpoint.includes('?') 
+                    ? `${baseUrl}/${endpoint}&limit=100&offset=${offset}` 
+                    : `${baseUrl}/${endpoint}?limit=100&offset=${offset}`;
+                
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) break;
+                    const res = await response.json();
+                    
+                    if (!res || !res.MRData) break;
+                    
+                    let items = [];
+                    if (res.MRData.RaceTable && res.MRData.RaceTable.Races) {
+                        items = res.MRData.RaceTable.Races;
+                    } else if (res.MRData.StandingsTable && res.MRData.StandingsTable.StandingsLists) {
+                        items = res.MRData.StandingsTable.StandingsLists;
+                    } else if (res.MRData.DriverTable && res.MRData.DriverTable.Drivers) {
+                        items = res.MRData.DriverTable.Drivers;
+                    } else if (res.MRData.ConstructorTable && res.MRData.ConstructorTable.Constructors) {
+                        items = res.MRData.ConstructorTable.Constructors;
+                    } else if (res.MRData.CircuitTable && res.MRData.CircuitTable.Circuits) {
+                        items = res.MRData.CircuitTable.Circuits;
+                    }
+                    
+                    if (items.length === 0) break;
+                    allData.push(...items);
+                    
+                    const total = parseInt(res.MRData.total) || 0;
+                    offset += 100;
+                    if (offset >= total) break;
+                } catch (e) {
+                    break;
+                }
+            }
+            return allData;
+        }
+
+        async function runBootSequence() {
+            const statusText = document.getElementById('bootStatusText');
+            const progress = document.getElementById('bootProgress');
+            
+            statusText.innerText = "ESTABLISHING API UPLINK...";
+            progress.style.width = "20%";
+            await new Promise(r => setTimeout(r, 600));
+
+            statusText.innerText = "SYNCING MASTER INDEXES...";
+            progress.style.width = "40%";
+            initSeasonSelector();
+            
+            buildSearchIndexes();
+
+            await new Promise(r => setTimeout(r, 600));
+
+            statusText.innerText = `FETCHING ${currentSelectedYear} SEASON DATA...`;
+            progress.style.width = "85%";
+            await loadSeasonData(currentSelectedYear);
+            
+            statusText.innerText = "READY.";
+            progress.style.width = "100%";
+            await new Promise(r => setTimeout(r, 500));
+
+            document.getElementById('bootScreen').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('bootScreen').style.display = 'none';
+                const mainApp = document.getElementById('mainApp');
+                mainApp.style.display = 'block';
+                setTimeout(() => { mainApp.style.opacity = '1'; }, 50);
+            }, 800);
+        }
+
+        function initSeasonSelector() {
+            const selectElem = document.getElementById('seasonSelect');
+            for (let year = 2026; year >= 1950; year--) {
+                const opt = document.createElement('option');
+                opt.value = year;
+                opt.textContent = year;
+                if (year === currentSelectedYear) opt.selected = true;
+                selectElem.appendChild(opt);
+            }
+
+            selectElem.addEventListener('change', (e) => {
+                currentSelectedYear = parseInt(e.target.value);
+                document.getElementById('calendarTitle').textContent = `${currentSelectedYear} Season Calendar`;
+                loadSeasonData(currentSelectedYear);
+            });
+        }
+
+        async function buildSearchIndexes() {
+            try {
+                globalDriverIndex = await fetchAllData('drivers.json');
+                globalConstructorIndex = await fetchAllData('constructors.json');
+                globalCircuitIndex = await fetchAllData('circuits.json');
+            } catch (err) {
+                console.error("Failed to build search indexes");
+            }
+        }
+
+        const searchInput = document.getElementById('globalSearch');
+        const searchDropdown = document.getElementById('searchResults');
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            if (query.length < 2) {
+                searchDropdown.style.display = 'none';
+                return;
+            }
+
+            searchDropdown.innerHTML = '';
+            let resultsFound = 0;
+
+            // Drivers
+            globalDriverIndex.forEach(driver => {
+                const fullName = `${driver.givenName} ${driver.familyName}`.toLowerCase();
+                if (fullName.includes(query) || driver.driverId.toLowerCase().includes(query)) {
+                    if (resultsFound < 15) {
+                        const div = document.createElement('div');
+                        div.className = 'search-result-item';
+                        div.innerHTML = `<span class="search-result-name">${esc(driver.givenName)} ${esc(driver.familyName)}</span><span class="search-result-type">Driver</span>`;
+                        div.onclick = () => {
+                            searchInput.value = '';
+                            searchDropdown.style.display = 'none';
+                            openDriverProfile(driver.driverId, `${driver.givenName} ${driver.familyName}`);
+                        };
+                        searchDropdown.appendChild(div);
+                        resultsFound++;
+                    }
+                }
+            });
+
+            // Teams
+            globalConstructorIndex.forEach(constructor => {
+                const name = constructor.name.toLowerCase();
+                if (name.includes(query) || constructor.constructorId.toLowerCase().includes(query)) {
+                    if (resultsFound < 15) {
+                        const div = document.createElement('div');
+                        div.className = 'search-result-item';
+                        div.innerHTML = `<span class="search-result-name">${esc(constructor.name)}</span><span class="search-result-type">Team</span>`;
+                        div.onclick = () => {
+                            searchInput.value = '';
+                            searchDropdown.style.display = 'none';
+                            openConstructorProfile(constructor.constructorId, constructor.name);
+                        };
+                        searchDropdown.appendChild(div);
+                        resultsFound++;
+                    }
+                }
+            });
+
+            // Circuits / Tracks
+            globalCircuitIndex.forEach(circuit => {
+                const name = circuit.circuitName.toLowerCase();
+                const loc = circuit.Location.country.toLowerCase();
+                if (name.includes(query) || loc.includes(query)) {
+                    if (resultsFound < 15) {
+                        const div = document.createElement('div');
+                        div.className = 'search-result-item';
+                        div.innerHTML = `<span class="search-result-name">${esc(circuit.circuitName)} (${esc(circuit.Location.locality)}, ${esc(circuit.Location.country)})</span><span class="search-result-type">Circuit</span>`;
+                        div.onclick = () => {
+                            searchInput.value = '';
+                            searchDropdown.style.display = 'none';
+                            openTrackProfileDirectly(circuit);
+                        };
+                        searchDropdown.appendChild(div);
+                        resultsFound++;
+                    }
+                }
+            });
+
+            if (resultsFound > 0) {
+                searchDropdown.style.display = 'block';
+            } else {
+                searchDropdown.innerHTML = `<div class="search-result-item" style="color: #666; justify-content: center;">No matches found</div>`;
+                searchDropdown.style.display = 'block';
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !searchDropdown.contains(e.target)) {
+                searchDropdown.style.display = 'none';
+            }
+        });
+
+        
+
+        async function fetchAPI(endpoint) {
+            loadingIndicator.style.display = 'block';
+            try {
+                let url = "";
+                if (endpoint.includes('.json') && !endpoint.includes('/')) {
+                    const year = endpoint.split('.json')[0];
+                    url = ERGAST_API_BASE.includes('/api/calendar') ? `/api/calendar?year=${year}` : `${ERGAST_API_BASE}/${endpoint}`;
+                } else {
+                    url = `/api/data/${endpoint}`;
+                }
+
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('API response not ok');
+                const data = await response.json();
+                loadingIndicator.style.display = 'none';
+                return data;
+            } catch (error) {
+                loadingIndicator.style.display = 'none';
+                return null;
+            }
+        }
+
+        async function loadSeasonData(year) {
+            loadingIndicator.style.display = 'block';
+            const calendarData = await fetchAPI(`${year}.json`);
+            loadingIndicator.style.display = 'none';
+
+            const calendarBody = document.getElementById('calendarBody');
+            
+            if (!calendarData?.MRData?.RaceTable?.Races?.length) {
+                calendarBody.innerHTML = `<tr><td colspan="4" class="tbd-row">No results</td></tr>`;
+            } else {
+                calendarBody.innerHTML = '';
+                calendarData.MRData.RaceTable.Races.forEach(race => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'clickable-row';
+                    const hasSprint = !!race.Sprint;
+                    const sprintBadge = hasSprint ? `<span class="sprint-badge">Sprint</span>` : '';
+                    
+                    tr.innerHTML = `
+                        <td style="font-family: 'Orbitron'; color: var(--accent-blue); font-weight: bold;">${esc(race.round.padStart(2, '0'))}</td>
+                        <td>${esc(race.raceName)} ${sprintBadge}</td>
+                        <td>${esc(race.Circuit.circuitName)}</td>
+                        <td>${esc(race.date)}</td>
+                    `;
+                    tr.onclick = () => openSidebar(race);
+                    calendarBody.appendChild(tr);
+                });
+            }
+
+            const driverData = await fetchAPI(`${year}/driverStandings.json`);
+            const driverBody = document.getElementById('mainDriverStandingsBody');
+            
+            if (!driverData?.MRData?.StandingsTable?.StandingsLists?.length) {
+                driverBody.innerHTML = `<tr><td colspan="3" class="tbd-row">No results</td></tr>`;
+            } else {
+                driverBody.innerHTML = '';
+                const standings = driverData.MRData.StandingsTable.StandingsLists[0].DriverStandings;
+                standings.forEach(pos => {
+                    const constructorName = pos.Constructors[0]?.name || "Unknown";
+                    const constructorId = pos.Constructors[0]?.constructorId || "";
+                    const tColor = teamColors[constructorName] || "#fff";
+                    const ptsVal = parseFloat(pos.points);
+                    const ptsLabel = ptsVal === 1 ? 'PT' : 'PTS';
+                    const driverId = pos.Driver.driverId;
+                    const driverFullName = `${pos.Driver.givenName} ${pos.Driver.familyName}`;
+                    
+                    driverBody.innerHTML += `
+                        <tr>
+                            <td class="pos-num">${esc(pos.position)}</td>
+                            <td class="team-border" style="border-left-color: ${tColor};">
+                                <div class="driver-name driver-link" onclick="openDriverProfile('${esq(driverId)}', '${esq(driverFullName)}')">${esc(driverFullName)}</div>
+                                <div class="driver-team driver-link" style="display:inline-block; margin-top: 2px;" onclick="openConstructorProfile('${esq(constructorId)}', '${esq(constructorName)}')">${esc(constructorName)}</div>
+                            </td>
+                            <td style="text-align:right; font-family: 'Orbitron'; font-weight: bold; font-size: 1rem;">
+                                ${esc(pos.points)} <span style="font-size: 0.7rem; font-weight: normal;">${esc(ptsLabel)}</span>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            const constructorData = await fetchAPI(`${year}/constructorStandings.json`);
+            const constructorBody = document.getElementById('mainConstructorStandingsBody');
+            
+            if (!constructorData?.MRData?.StandingsTable?.StandingsLists?.length) {
+                constructorBody.innerHTML = `<tr><td colspan="3" class="tbd-row">No results</td></tr>`;
+            } else {
+                constructorBody.innerHTML = '';
+                const standings = constructorData.MRData.StandingsTable.StandingsLists[0].ConstructorStandings;
+                standings.forEach(pos => {
+                    const constructorName = pos.Constructor.name;
+                    const constructorId = pos.Constructor.constructorId;
+                    const tColor = teamColors[constructorName] || "#fff";
+                    const ptsVal = parseFloat(pos.points);
+                    const ptsLabel = ptsVal === 1 ? 'PT' : 'PTS';
+
+                    constructorBody.innerHTML += `
+                        <tr>
+                            <td class="pos-num">${esc(pos.position)}</td>
+                            <td class="team-border" style="border-left-color: ${tColor};">
+                                <span class="driver-name driver-link" onclick="openConstructorProfile('${esq(constructorId)}', '${esq(constructorName)}')">${esc(constructorName)}</span>
+                            </td>
+                            <td style="text-align:right; font-family: 'Orbitron'; font-weight: bold; font-size: 1rem;">
+                                ${esc(pos.points)} <span style="font-size: 0.7rem; font-weight: normal;">${esc(ptsLabel)}</span>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+
+        const overlay = document.getElementById('panelOverlay');
+        const panel = document.getElementById('telemetryPanel');
+        const leftSidebar = document.getElementById('leftSidebar');
+        const closeBtn = document.getElementById('closePanelBtn');
+        const closeLeftSidebarBtn = document.getElementById('closeLeftSidebarBtn');
+        const panelContentContainer = document.getElementById('panelContentContainer');
+        
+        function openSidebar(raceObj) {
+            currentSelectedRound = raceObj.round;
+            activeRaceHasSprint = !!raceObj.Sprint;
+            activeCircuitObj = raceObj.Circuit;
+            
+            document.getElementById('panelTitle').textContent = raceObj.raceName;
+            document.getElementById('panelSubtitle').textContent = `${currentSelectedYear} Round ${raceObj.round} | ${activeCircuitObj.circuitName}`;
+            
+            const sprintTab = document.getElementById('sprintTab');
+            if (activeRaceHasSprint) {
+                sprintTab.style.display = 'inline-block';
+            } else {
+                sprintTab.style.display = 'none';
+            }
+
+            document.querySelectorAll('.session-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.session-tab[data-endpoint="results"]').classList.add('active');
+
+            panelContentContainer.innerHTML = `
+                <table class="mini-table" id="resultsTableElement">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left;">Pos</th>
+                            <th style="text-align: left;">Driver</th>
+                            <th style="text-align: right;" id="pointsColHeader">Points / Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="raceResultsBody"></tbody>
+                </table>
+            `;
+
+            overlay.classList.add('active');
+            panel.classList.add('active');
+            
+            loadSessionData('results', 'Race Results');
+        }
+
+        async function openDriverProfile(driverId, driverFullName) {
+            leftSidebar.className = 'side-panel-left active';
+            document.getElementById('leftSidebarTitle').textContent = driverFullName;
+            document.getElementById('leftSidebarSubtitle').textContent = "Driver Profile & Career Statistics";
+            const detailsBody = document.getElementById('leftSidebarBody');
+            
+            overlay.classList.add('active');
+
+            if (memoryBuffer.profiles[driverId]) {
+                detailsBody.innerHTML = memoryBuffer.profiles[driverId];
+                return;
+            }
+
+            detailsBody.innerHTML = `<tr><td colspan="2" class="tbd-row">Calculating exact historical metrics...<br><span style="font-size:0.65rem; color:var(--accent-blue);">(Scanning entire database from 1950)</span></td></tr>`;
+
+            try {
+                const driverInfo = await fetchAPI(`drivers/${driverId}.json`);
+                
+                const allDriverRaces = await fetchAllData(`drivers/${driverId}/results.json`);
+                allDriverRaces.sort((a, b) => parseInt(a.season) - parseInt(b.season) || parseInt(a.round) - parseInt(b.round));
+                const validDriverRaces = allDriverRaces.filter(r => parseInt(r.season) <= currentSelectedYear);
+
+                let racesRan = validDriverRaces.length;
+                let wins = 0;
+                let podiums = 0;
+                let firstComp = "None";
+                let firstPodium = "None";
+                let pastTeams = [];
+
+                if (racesRan > 0) {
+                    firstComp = `${validDriverRaces[0].raceName} (${validDriverRaces[0].season})`;
+                    
+                    validDriverRaces.forEach(r => {
+                        if (r.Results && r.Results.length > 0) {
+                            const pos = parseInt(r.Results[0].position);
+                            if (pos === 1) wins++;
+                            if (pos <= 3) {
+                                podiums++;
+                                if (firstPodium === "None") {
+                                    firstPodium = `${r.raceName} (${r.season}) - P${pos}`;
+                                }
+                            }
+                            
+                            if (r.Results[0].Constructor && r.Results[0].Constructor.name) {
+                                const teamName = r.Results[0].Constructor.name;
+                                if (!pastTeams.includes(teamName)) {
+                                    pastTeams.push(teamName);
+                                }
+                            }
+                        }
+                    });
+                }
+
+                let dob = "Unknown";
+                let nationality = "Unknown";
+                let permanentNumber = "-";
+                if (driverInfo?.MRData?.DriverTable?.Drivers?.[0]) {
+                    const d = driverInfo.MRData.DriverTable.Drivers[0];
+                    dob = d.dateOfBirth || "Unknown";
+                    nationality = d.nationality || "Unknown";
+                    permanentNumber = d.permanentNumber ? `#${d.permanentNumber}` : "-";
+                }
+
+                const teamsString = pastTeams.length > 0 ? pastTeams.join(" &rarr; ") : "None";
+
+                const finalHTML = `
+                    <tr><td><strong>Birth Date</strong></td><td style="text-align:right; font-family:'Orbitron';">${esc(dob)}</td></tr>
+                    <tr><td><strong>Nationality</strong></td><td style="text-align:right; font-family:'Orbitron';">${esc(nationality)}</td></tr>
+                    <tr><td><strong>Car Number</strong></td><td style="text-align:right; font-family:'Orbitron';">${esc(permanentNumber)}</td></tr>
+                    <tr><td><strong>Races Entered</strong></td><td style="text-align:right; font-family:'Orbitron'; color:var(--accent-blue);">${racesRan}</td></tr>
+                    <tr><td><strong>Career Wins</strong></td><td style="text-align:right; font-family:'Orbitron'; color:var(--status-done);">${wins}</td></tr>
+                    <tr><td><strong>Total Podiums</strong></td><td style="text-align:right; font-family:'Orbitron'; color:var(--status-upcoming);">${podiums}</td></tr>
+                    <tr><td><strong>First Competition</strong></td><td style="text-align:right; font-size:0.85rem;">${esc(firstComp)}</td></tr>
+                    <tr><td><strong>First Podium</strong></td><td style="text-align:right; font-size:0.85rem; color:var(--status-upcoming);">${esc(firstPodium)}</td></tr>
+                    <tr><td colspan="2" style="padding-top: 1rem; border-bottom: none;">
+                        <div style="font-family: 'Orbitron'; color: var(--accent-blue); text-transform: uppercase; font-size: 0.8rem; margin-bottom: 0.4rem; letter-spacing: 1px;">Teams Career Path</div>
+                        <div style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; font-family: 'Rajdhani'; font-weight: 600;">${esc(teamsString)}</div>
+                    </td></tr>
+                `;
+                
+                memoryBuffer.profiles[driverId] = finalHTML;
+                detailsBody.innerHTML = finalHTML;
+            } catch(e) {
+                console.error(e);
+                detailsBody.innerHTML = `<tr><td colspan="2" class="tbd-row">Failed to load exhaustive records</td></tr>`;
+            }
+        }
+
+        async function openConstructorProfile(constructorId, constructorName) {
+            if(!constructorId) return;
+            leftSidebar.className = 'side-panel-left active constructor-mode';
+            document.getElementById('leftSidebarTitle').textContent = constructorName;
+            document.getElementById('leftSidebarSubtitle').textContent = "Team Heritage & Statistics";
+            const detailsBody = document.getElementById('leftSidebarBody');
+            
+            overlay.classList.add('active');
+
+            if (memoryBuffer.profiles[constructorId]) {
+                detailsBody.innerHTML = memoryBuffer.profiles[constructorId];
+                return;
+            }
+
+            detailsBody.innerHTML = `<tr><td colspan="2" class="tbd-row">Calculating exact historical metrics...<br><span style="font-size:0.65rem; color:var(--accent-blue);">(Scanning entire database from 1950 - 2026)</span></td></tr>`;
+
+            try {
+                const infoRes = await fetchAPI(`constructors/${constructorId}.json`);
+                let nationality = infoRes?.MRData?.ConstructorTable?.Constructors?.[0]?.nationality || "Unknown";
+
+                const allConstructorRaces = await fetchAllData(`constructors/${constructorId}/results.json`);
+                allConstructorRaces.sort((a,b) => parseInt(a.season) - parseInt(b.season) || parseInt(a.round) - parseInt(b.round));
+                const validCRaces = allConstructorRaces.filter(r => parseInt(r.season) <= currentSelectedYear);
+
+                let firstYear = "Unknown", firstRace = "Unknown";
+                let totalWins = 0;
+                let uniqueRaceSet = new Set();
+
+                if (validCRaces.length > 0) {
+                    firstYear = validCRaces[0].season;
+                    firstRace = validCRaces[0].raceName;
+                }
+
+                validCRaces.forEach(race => {
+                    uniqueRaceSet.add(`${race.season}-${race.round}`);
+                    let hasWin = false;
+                    race.Results.forEach(res => {
+                        if (parseInt(res.position) === 1) hasWin = true;
+                    });
+                    if (hasWin) totalWins++;
+                });
+
+                let totalRaces = uniqueRaceSet.size;
+
+                let backgroundText = `${constructorName} is a historic Formula 1 constructor racing under the ${esc(nationality)} flag. `;
+                if (firstYear !== "Unknown") {
+                    backgroundText += `They made their official Grand Prix debut at the ${esc(firstYear)} ${esc(firstRace)}. `;
+                }
+                backgroundText += `Over their competitive history in the pinnacle of motorsport, they have meticulously earned ${totalWins} race victories.`;
+
+                let heritageBlock = "";
+                if (constructorHeritageMap[constructorId]) {
+                    heritageBlock = `
+                        <tr><td colspan="2" style="padding-top: 1rem; padding-bottom: 0; border-bottom: none;">
+                            <div style="font-family: 'Orbitron'; color: var(--constructor-gold); text-transform: uppercase; font-size: 0.8rem; margin-bottom: 0.4rem; letter-spacing: 1px;">Franchise Lineage</div>
+                            <div style="font-size: 0.85rem; color: var(--text-main); font-weight: 600;">${constructorHeritageMap[constructorId]}</div>
+                        </td></tr>
+                    `;
+                }
+
+                const finalHTML = `
+                    <tr><td><strong>Nationality</strong></td><td style="text-align:right; font-family:'Orbitron';">${esc(nationality)}</td></tr>
+                    <tr><td><strong>Debut Year</strong></td><td style="text-align:right; font-family:'Orbitron';">${esc(firstYear)}</td></tr>
+                    <tr><td><strong>First Race</strong></td><td style="text-align:right; font-size:0.85rem;">${esc(firstRace)}</td></tr>
+                    <tr><td><strong>Races Entered</strong></td><td style="text-align:right; font-family:'Orbitron'; color:var(--accent-blue);">${totalRaces}</td></tr>
+                    <tr><td><strong>Total F1 Wins</strong></td><td style="text-align:right; font-family:'Orbitron'; color:var(--status-done);">${totalWins}</td></tr>
+                    ${heritageBlock}
+                    <tr><td colspan="2" style="padding-top: 1rem; border-bottom: none;">
+                        <div style="font-family: 'Orbitron'; color: var(--accent-blue); text-transform: uppercase; font-size: 0.8rem; margin-bottom: 0.5rem; letter-spacing: 1px;">Background Info</div>
+                        <div style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; text-transform: none; font-family: 'Rajdhani';">${esc(backgroundText)}</div>
+                    </td></tr>
+                `;
+
+                memoryBuffer.profiles[constructorId] = finalHTML;
+                detailsBody.innerHTML = finalHTML;
+            } catch(e) {
+                console.error(e);
+                detailsBody.innerHTML = `<tr><td colspan="2" class="tbd-row">Failed to load exhaustive team records</td></tr>`;
+            }
+        }
+
+        async function openTrackProfileDirectly(circuitObj) {
+            activeCircuitObj = circuitObj;
+            openTrackProfileSidebar();
+        }
+
+        async function openTrackProfileSidebar() {
+            if (!activeCircuitObj) return;
+            const circuitId = activeCircuitObj.circuitId;
+
+            leftSidebar.className = 'side-panel-left active track-mode';
+            document.getElementById('leftSidebarTitle').textContent = activeCircuitObj.circuitName;
+            document.getElementById('leftSidebarSubtitle').textContent = `${esc(activeCircuitObj.Location.locality)}, ${esc(activeCircuitObj.Location.country)}`;
+            const detailsBody = document.getElementById('leftSidebarBody');
+            
+            overlay.classList.add('active');
+
+            if (memoryBuffer.tracks[circuitId]) {
+                detailsBody.innerHTML = memoryBuffer.tracks[circuitId];
+                return;
+            }
+
+            detailsBody.innerHTML = `<tr><td colspan="2" class="tbd-row">Scanning circuit archives and recent podiums...</td></tr>`;
+
+            try {
+                const allTrackRaces = await fetchAllData(`circuits/${circuitId}/results/1.json`);
+                let startedYear = "Unavailable";
+                let firstWinnerStr = "Unavailable";
+                let mostWinsStr = "Unavailable";
+                let totalRacesCount = allTrackRaces.length;
+                let backgroundStr = `${activeCircuitObj.circuitName} is hosted in ${activeCircuitObj.Location.country}. `;
+
+                if (totalRacesCount > 0) {
+                    allTrackRaces.sort((a,b) => parseInt(a.season) - parseInt(b.season) || parseInt(a.round) - parseInt(b.round));
+                    const firstRace = allTrackRaces[0];
+                    startedYear = firstRace.season;
+                    
+                    const winnerObj = firstRace.Results[0];
+                    if (winnerObj) {
+                        const driver = winnerObj.Driver;
+                        firstWinnerStr = `${driver.givenName} ${driver.familyName} (${winnerObj.Constructor.name}) in ${firstRace.season}`;
+                    }
+
+                    const winCounts = {};
+                    allTrackRaces.forEach(race => {
+                        const winner = race.Results[0];
+                        if (winner) {
+                            const d = winner.Driver;
+                            const name = `${d.givenName} ${d.familyName}`;
+                            winCounts[name] = (winCounts[name] || 0) + 1;
+                        }
+                    });
+
+                    let maxWins = 0;
+                    let topDrivers = [];
+                    for (const [drv, cnt] of Object.entries(winCounts)) {
+                        if (cnt > maxWins) {
+                            maxWins = cnt;
+                            topDrivers = [drv];
+                        } else if (cnt === maxWins) {
+                            topDrivers.push(drv);
+                        }
+                    }
+                    mostWinsStr = `${topDrivers.join(" & ")} (${maxWins} wins)`;
+                    backgroundStr += `This venue has historically hosted ${totalRacesCount} championship Grands Prix.`;
+                } else {
+                    backgroundStr += `Detailed race history for this circuit is still being compiled.`;
+                }
+
+                // Recent Winners in the past 5 years (2026 down to 2022)
+                let recentWinnersHTML = "";
+                const currentYearNum = new Date().getFullYear();
+                const pastYears = [currentYearNum, currentYearNum-1, currentYearNum-2, currentYearNum-3, currentYearNum-4];
+                
+                let recentListEntries = [];
+                allTrackRaces.forEach(r => {
+                    if (pastYears.includes(parseInt(r.season))) {
+                        const w = r.Results[0];
+                        if (w) {
+                            recentListEntries.push({
+                                season: r.season,
+                                name: `${w.Driver.givenName} ${w.Driver.familyName}`,
+                                constructor: w.Constructor.name
+                            });
+                        }
+                    }
+                });
+
+                recentListEntries.sort((a,b) => parseInt(b.season) - parseInt(a.season));
+
+                if (recentListEntries.length > 0) {
+                    recentListEntries.forEach(item => {
+                        recentWinnersHTML += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.03);"><span>${esc(item.season)}</span><strong style="color:#fff;">${esc(item.name)} (${esc(item.constructor)})</strong></div>`;
+                    });
+                } else {
+                    recentWinnersHTML = `<div style="font-size:0.85rem; color:var(--text-muted);">No records found for the past 5 years.</div>`;
+                }
+
+                const finalHTML = `
+                    <tr><td><strong>Location</strong></td><td style="text-align:right; font-family:'Orbitron';">${esc(activeCircuitObj.Location.locality)}, ${esc(activeCircuitObj.Location.country)}</td></tr>
+                    <tr><td><strong>Total Races Held</strong></td><td style="text-align:right; font-family:'Orbitron'; color:var(--accent-blue);">${totalRacesCount}</td></tr>
+                    <tr><td><strong>First Grand Prix</strong></td><td style="text-align:right; font-family:'Orbitron';">${startedYear}</td></tr>
+                    <tr><td><strong>First Winner</strong></td><td style="text-align:right; font-size:0.85rem;">${esc(firstWinnerStr)}</td></tr>
+                    <tr><td><strong>Most Wins Driver</strong></td><td style="text-align:right; font-size:0.85rem; color:var(--status-done);">${esc(mostWinsStr)}</td></tr>
+                    <tr><td colspan="2" style="padding-top: 1rem; border-bottom: none;">
+                        <div style="font-family: 'Orbitron'; color: var(--status-upcoming); text-transform: uppercase; font-size: 0.8rem; margin-bottom: 0.4rem; letter-spacing: 1px;">Recent Winners</div>
+                        <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px;">${recentWinnersHTML}</div>
+                    </td></tr>
+                    <tr><td colspan="2" style="padding-top: 1rem; border-bottom: none;">
+                        <div style="font-family: 'Orbitron'; color: var(--status-done); text-transform: uppercase; font-size: 0.8rem; margin-bottom: 0.5rem; letter-spacing: 1px;">Circuit Info & History</div>
+                        <div style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; text-transform: none; font-family: 'Rajdhani';">${esc(backgroundStr)}</div>
+                    </td></tr>
+                `;
+
+                memoryBuffer.tracks[circuitId] = finalHTML;
+                detailsBody.innerHTML = finalHTML;
+
+            } catch (err) {
+                detailsBody.innerHTML = `<tr><td colspan="2" class="tbd-row">Failed to load track information</td></tr>`;
+            }
+        }
+
+        async function loadSessionData(sessionEndpoint, title) {
+            document.querySelectorAll('.session-tab').forEach(t => t.classList.remove('active'));
+            const activeTabBtn = document.querySelector(`.session-tab[data-endpoint="${sessionEndpoint}"]`);
+            if(activeTabBtn) activeTabBtn.classList.add('active');
+
+            document.getElementById('sessionTableTitle').textContent = title;
+            
+            if (!document.getElementById('resultsTableElement')) {
+                panelContentContainer.innerHTML = `
+                    <table class="mini-table" id="resultsTableElement">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left;">Pos</th>
+                                <th style="text-align: left;">Driver</th>
+                                <th style="text-align: right;" id="pointsColHeader">Points / Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="raceResultsBody"></tbody>
+                    </table>
+                `;
+            }
+
+            const targetResultsBody = document.getElementById('raceResultsBody');
+            targetResultsBody.innerHTML = `<tr><td colspan="3" class="tbd-row">Fetching Data...</td></tr>`;
+
+            const pointsColHeader = document.getElementById('pointsColHeader');
+            if (pointsColHeader) {
+                if (sessionEndpoint === 'qualifying') {
+                    pointsColHeader.textContent = "Time";
+                } else {
+                    pointsColHeader.textContent = "Points / Time";
+                }
+            }
+
+            const endpoint = `${currentSelectedYear}/${currentSelectedRound}/${sessionEndpoint}.json`;
+            const sessionData = await fetchAPI(endpoint);
+
+            if (!sessionData?.MRData?.RaceTable?.Races?.length) {
+                targetResultsBody.innerHTML = `<tr><td colspan="3" class="tbd-row">No results</td></tr>`;
+                return;
+            }
+
+            targetResultsBody.innerHTML = '';
+            const raceObj = sessionData.MRData.RaceTable.Races[0];
+            let resultsList = [];
+            
+            if (sessionEndpoint === 'results') resultsList = raceObj.Results;
+            else if (sessionEndpoint === 'qualifying') resultsList = raceObj.QualifyingResults;
+            else if (sessionEndpoint === 'sprint') resultsList = raceObj.SprintResults;
+
+            if (!resultsList || resultsList.length === 0) {
+                targetResultsBody.innerHTML = `<tr><td colspan="3" class="tbd-row">No results</td></tr>`;
+                return;
+            }
+
+            let winnerLaps = 0;
+            if (resultsList && resultsList.length > 0) {
+                const winner = resultsList.find(r => parseInt(r.position) === 1);
+                if (winner) {
+                    winnerLaps = parseInt(winner.laps) || 0;
+                }
+            }
+
+            resultsList.forEach(driverRow => {
+                const constructorName = driverRow.Constructor?.name || "";
+                const constructorId = driverRow.Constructor?.constructorId || "";
+                const tColor = teamColors[constructorName] || "#fff";
+                const driverId = driverRow.Driver.driverId;
+                const driverFullName = `${driverRow.Driver.givenName} ${driverRow.Driver.familyName}`;
+                
+                let rightColHTML = "";
+                if (sessionEndpoint === 'qualifying') {
+                    const time = driverRow.Q3 || driverRow.Q2 || driverRow.Q1 || "No Time";
+                    rightColHTML = `<span style="font-family: 'Orbitron'; font-size: 0.85rem; color: var(--accent-blue);">${time}</span>`;
+                } else {
+                    const pts = driverRow.points;
+                    const ptsVal = parseFloat(pts);
+                    const ptsLabel = ptsVal === 1 ? 'PT' : 'PTS';
+                    
+                    let raceTime = "";
+                    let statusLow = driverRow.status ? driverRow.status.toLowerCase() : "";
+                    let posText = driverRow.positionText ? driverRow.positionText.toUpperCase() : "";
+
+                    if (posText === "W" || statusLow.includes("did not start") || statusLow.includes("withdrew")) {
+                        raceTime = "DNS";
+                    } else if (posText === "D" || statusLow.includes("disqualified")) {
+                        raceTime = "DSQ";
+                    } else if (posText === "R") {
+                        raceTime = "DNF";
+                    } else if (parseInt(driverRow.position) === 1) {
+                        raceTime = driverRow.Time && driverRow.Time.time ? driverRow.Time.time : "Winner";
+                    } else if (statusLow.includes("lap") || statusLow === "lapped") {
+                        let lapsMatch = driverRow.status.match(/\d+/);
+                        if (lapsMatch) {
+                            let laps = parseInt(lapsMatch[0]);
+                            raceTime = `+${laps} Lap${laps > 1 ? 's' : ''}`;
+                        } else if (winnerLaps > 0 && parseInt(driverRow.laps) > 0) {
+                            let lapsDown = winnerLaps - parseInt(driverRow.laps);
+                            if (lapsDown > 0) {
+                                raceTime = `+${lapsDown} Lap${lapsDown > 1 ? 's' : ''}`;
+                            } else {
+                                raceTime = "+1 Lap";
+                            }
+                        } else {
+                            raceTime = "+1 Lap";
+                        }
+                    } else if (driverRow.Time && driverRow.Time.time) {
+                        raceTime = driverRow.Time.time;
+                    } else if (statusLow === "finished") {
+                        raceTime = "Finished";
+                    } else {
+                        raceTime = "DNF";
+                    }
+                    
+                    rightColHTML = `
+                        <div style="font-family: 'Orbitron'; font-weight: bold; color: var(--status-done);">${esc(pts !== undefined ? pts + ' ' + ptsLabel : '')}</div>
+                        <div style="font-family: 'Rajdhani'; font-size: 0.75rem; color: var(--text-muted);">${esc(raceTime)}</div>
+                    `;
+                }
+
+                targetResultsBody.innerHTML += `
+                    <tr>
+                        <td class="pos-num">P${esc(driverRow.position)}</td>
+                        <td class="team-border" style="border-left-color: ${tColor};">
+                            <div class="driver-name driver-link" onclick="openDriverProfile('${esq(driverId)}', '${esq(driverFullName)}')">${esc(driverFullName)} <span style="color:var(--text-muted); font-size:0.7rem; margin-left:4px;">#${esc(driverRow.Driver.permanentNumber || driverRow.number || '')}</span></div>
+                            <div class="driver-team driver-link" onclick="openConstructorProfile('${esq(constructorId)}', '${esq(constructorName)}')">${esc(constructorName)}</div>
+                        </td>
+                        <td style="text-align: right;">${rightColHTML}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        document.querySelectorAll('.session-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const endpoint = e.target.dataset.endpoint;
+                if (endpoint === 'info') {
+                    openTrackProfileSidebar();
+                } else {
+                    const title = e.target.textContent;
+                    loadSessionData(endpoint, title === "Race" ? "Race Results" : title + " Results");
+                }
+            });
+        });
+
+        const closePanel = () => { overlay.classList.remove('active'); panel.classList.remove('active'); leftSidebar.classList.remove('active'); };
+        const closeLeftSidebar = () => { leftSidebar.classList.remove('active'); if (!panel.classList.contains('active')) overlay.classList.remove('active'); };
+
+        closeBtn.addEventListener('click', closePanel);
+        closeLeftSidebarBtn.addEventListener('click', closeLeftSidebar);
+        overlay.addEventListener('click', () => { closePanel(); closeLeftSidebar(); });
+
+        
+        // 兜底：8 秒后无论数据是否加载完成，都强制显示主界面
+        setTimeout(function () {
+            var bootEl = document.getElementById('bootScreen');
+            if (bootEl) bootEl.style.opacity = '0';
+            var mainEl = document.getElementById('mainApp');
+            if (mainEl) { mainEl.style.display = 'block'; mainEl.style.opacity = '1'; }
+        }, 8000);
+
+        window.addEventListener('load', runBootSequence);
+    </script>
+    <script src="chat.js"></script>
+    <script>
+(function () {
+    const mqPhone = window.matchMedia('(max-width: 768px)');
+    const mqTablet = window.matchMedia('(min-width: 769px) and (max-width: 1024px)');
+
+    function classify() {
+        const root = document.documentElement;
+        root.classList.remove('device-phone', 'device-tablet', 'device-desktop');
+        if (mqPhone.matches) root.classList.add('device-phone');
+        else if (mqTablet.matches) root.classList.add('device-tablet');
+        else root.classList.add('device-desktop');
+    }
+
+    classify();
+    mqPhone.addEventListener('change', classify);
+    mqTablet.addEventListener('change', classify);
+})();
+</script>
+</body>
+</html>

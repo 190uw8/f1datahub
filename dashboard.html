@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F1 Data Hub - 后台管理</title>
+<style>
+    :root {
+        --f1-red: #ff1801;
+        --accent-blue: #00f0ff;
+        --bg: #0a0a0f;
+        --card: rgba(20, 20, 28, 0.85);
+        --panel: rgba(13, 13, 20, 0.98);
+        --text: #ffffff;
+        --muted: #9ca3af;
+        --green: #4ade80;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; padding: 1.5rem;
+        font-family: 'Rajdhani', 'Segoe UI', Arial, sans-serif;
+        background: var(--bg); color: var(--text); line-height: 1.5;
+    }
+    h1 { font-family: 'Orbitron', 'Rajdhani', sans-serif; font-size: 1.4rem; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
+    h2 { font-family: 'Orbitron', 'Rajdhani', sans-serif; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid var(--f1-red); padding-bottom: 0.3rem; margin: 0 0 1rem; }
+    .view { max-width: 1000px; margin: 0 auto; }
+    .hidden { display: none !important; }
+    .card { background: var(--card); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 1.2rem; margin-bottom: 1.2rem; }
+    .center { max-width: 420px; margin: 8vh auto; text-align: center; }
+    input, select {
+        width: 100%; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.9rem;
+        background: #161622; border: 1px solid #333; border-radius: 4px;
+        color: var(--text); font-size: 1rem; font-family: inherit;
+    }
+    input:focus { border-color: var(--accent-blue); outline: none; }
+    input[type="checkbox"] { width: auto; margin-right: 0.4rem; }
+    button {
+        background: var(--f1-red); color: #fff; border: none; border-radius: 4px;
+        padding: 0.6rem 1.2rem; font-size: 0.95rem; font-weight: 700;
+        cursor: pointer; font-family: inherit; text-transform: uppercase; letter-spacing: 1px;
+    }
+    button:hover { background: #cc1400; }
+    button.secondary { background: #1d1d2a; border: 1px solid #444; }
+    button.secondary:hover { background: #2a2a3a; }
+    button.danger { background: transparent; border: 1px solid var(--f1-red); color: var(--f1-red); padding: 0.35rem 0.7rem; font-size: 0.8rem; }
+    button.danger:hover { background: var(--f1-red); color: #fff; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; }
+    nav { display: flex; gap: 0.5rem; margin-bottom: 1.2rem; }
+    nav button { background: #1d1d2a; border: 1px solid #444; }
+    nav button.active { background: var(--f1-red); border-color: var(--f1-red); }
+    .toolbar { display: flex; gap: 0.6rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem; }
+    .toolbar label { font-size: 0.75rem; color: var(--accent-blue); text-transform: uppercase; letter-spacing: 1px; }
+    .toolbar input { width: 120px; margin: 0.2rem 0 0; }
+    .toolbar button { margin: 0; padding: 0.55rem 1rem; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.6rem 1rem; align-items: end; }
+    .form-grid label { font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+    th, td { padding: 0.55rem 0.6rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    th { font-family: 'Orbitron', 'Rajdhani', sans-serif; color: var(--f1-red); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; }
+    .status { margin-top: 0.8rem; font-weight: 700; min-height: 1.2em; }
+    .ok { color: var(--green); }
+    .err { color: var(--f1-red); }
+    .count { color: var(--accent-blue); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<div id="loginView" class="view center">
+    <div class="card">
+        <h1>F1 Data Hub 后台</h1>
+        <p style="color:var(--muted); font-size:0.9rem;">请输入管理员密码登录</p>
+        <input type="password" id="password" placeholder="管理员密码" onkeypress="if(event.key==='Enter')login()">
+        <button onclick="login()" style="width:100%;">登 录</button>
+        <div class="status" id="loginStatus"></div>
+    </div>
+</div>
+
+<div id="mainView" class="view hidden">
+    <header>
+        <h1>F1 Data Hub 后台</h1>
+        <button class="secondary" onclick="logout()">退出登录</button>
+    </header>
+
+    <nav>
+        <button class="tab active" onclick="showTab('races')">赛程覆盖</button>
+        <button class="tab" onclick="showTab('bans')">IP 封禁</button>
+    </nav>
+
+    <section id="tab-races">
+        <div class="toolbar">
+            <label>赛季年份
+                <input type="text" id="year" value="2026">
+            </label>
+            <button onclick="loadRaces()">加载赛程</button>
+        </div>
+
+        <div class="card">
+            <h2>添加 / 修改覆盖 <span class="count" id="raceCount"></span></h2>
+            <div class="form-grid">
+                <label>回合数<input type="text" id="round" placeholder="如 16"></label>
+                <label>比赛名称<input type="text" id="raceName" placeholder="如 Sepang GP"></label>
+                <label>赛道 ID<input type="text" id="circuitId" placeholder="如 sepang"></label>
+                <label>赛道显示名称<input type="text" id="circuitName" placeholder="如 Sepang International Circuit"></label>
+                <label>比赛日期<input type="date" id="date"></label>
+                <label><input type="checkbox" id="hasSprint"> 包含冲刺赛</label>
+            </div>
+            <button onclick="saveRace()">保存覆盖</button>
+            <button class="secondary" onclick="clearForm()">清空表单</button>
+            <div class="status" id="raceStatus"></div>
+        </div>
+
+        <div class="card">
+            <h2>已保存的覆盖</h2>
+            <table>
+                <thead><tr><th>回合</th><th>比赛</th><th>赛道</th><th>日期</th><th>冲刺</th><th>操作</th></tr></thead>
+                <tbody id="raceTable"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="tab-bans" class="hidden">
+        <div class="toolbar">
+            <button onclick="loadBans()">刷新封禁列表</button>
+        </div>
+        <div class="card">
+            <h2>被封禁的 IP（AI 高频访问）</h2>
+            <table>
+                <thead><tr><th>IP</th><th>封禁时间</th><th>操作</th></tr></thead>
+                <tbody id="banTable"></tbody>
+            </table>
+            <div class="status" id="banStatus"></div>
+        </div>
+    </section>
+</div>
+
+<script>
+const TOKEN_KEY = 'dashboard_token';
+
+function showLogin() {
+    document.getElementById('loginView').classList.remove('hidden');
+    document.getElementById('mainView').classList.add('hidden');
+}
+
+function showMain() {
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('mainView').classList.remove('hidden');
+    loadRaces().catch(() => {});
+    loadBans().catch(() => {});
+}
+
+function logout() {
+    sessionStorage.removeItem(TOKEN_KEY);
+    showLogin();
+}
+
+async function api(path, options = {}) {
+    const token = sessionStorage.getItem(TOKEN_KEY);
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(path, { ...options, headers });
+    let data = {};
+    try { data = await res.json(); } catch (e) {}
+    if (res.status === 401) {
+        sessionStorage.removeItem(TOKEN_KEY);
+        showLogin();
+        throw new Error('登录已过期，请重新登录');
+    }
+    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+    return data;
+}
+
+async function login() {
+    const password = document.getElementById('password').value;
+    const status = document.getElementById('loginStatus');
+    status.className = 'status';
+    status.textContent = '登录中...';
+    try {
+        const res = await fetch('/api/admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'login', password })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || '登录失败');
+        sessionStorage.setItem(TOKEN_KEY, data.token);
+        showMain();
+    } catch (err) {
+        status.className = 'status err';
+        status.textContent = '❌ ' + err.message;
+    }
+}
+
+function showTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.textContent.includes(name === 'races' ? '赛程' : 'IP')));
+    document.getElementById('tab-races').classList.toggle('hidden', name !== 'races');
+    document.getElementById('tab-bans').classList.toggle('hidden', name !== 'bans');
+}
+
+function setStatus(id, msg, ok) {
+    const el = document.getElementById(id);
+    el.className = 'status ' + (ok ? 'ok' : 'err');
+    el.textContent = (ok ? '✅ ' : '❌ ') + msg;
+}
+
+async function loadRaces() {
+    const year = document.getElementById('year').value.trim();
+    if (!/^\d{4}$/.test(year)) { setStatus('raceStatus', '年份格式应为四位数字', false); return; }
+    const data = await api('/api/admin?year=' + encodeURIComponent(year));
+    const tbody = document.getElementById('raceTable');
+    tbody.innerHTML = '';
+    document.getElementById('raceCount').textContent = '(' + data.races.length + ')';
+    const sorted = data.races.slice().sort((a, b) => Number(a.round) - Number(b.round));
+    sorted.forEach(r => {
+        const tr = document.createElement('tr');
+        [r.round, r.raceName, (r.Circuit && r.Circuit.circuitName) || '', r.date, r.Sprint ? '是' : '否'].forEach(v => {
+            const td = document.createElement('td');
+            td.textContent = v == null ? '' : v;
+            tr.appendChild(td);
+        });
+        const opTd = document.createElement('td');
+        const editBtn = document.createElement('button');
+        editBtn.className = 'secondary';
+        editBtn.textContent = '编辑';
+        editBtn.addEventListener('click', () => fillForm(r));
+        const delBtn = document.createElement('button');
+        delBtn.className = 'danger';
+        delBtn.textContent = '删除';
+        delBtn.addEventListener('click', () => deleteRace(r));
+        opTd.appendChild(editBtn);
+        opTd.appendChild(delBtn);
+        tr.appendChild(opTd);
+        tbody.appendChild(tr);
+    });
+}
+
+function fillForm(r) {
+    document.getElementById('year').value = document.getElementById('year').value || String(new Date().getFullYear());
+    document.getElementById('round').value = r.round;
+    document.getElementById('raceName').value = r.raceName || '';
+    document.getElementById('circuitId').value = (r.Circuit && r.Circuit.circuitId) || '';
+    document.getElementById('circuitName').value = (r.Circuit && r.Circuit.circuitName) || '';
+    document.getElementById('date').value = r.date || '';
+    document.getElementById('hasSprint').checked = !!r.Sprint;
+}
+
+function clearForm() {
+    ['round', 'raceName', 'circuitId', 'circuitName', 'date'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('hasSprint').checked = false;
+}
+
+async function saveRace() {
+    const payload = {
+        year: document.getElementById('year').value.trim(),
+        round: document.getElementById('round').value.trim(),
+        raceName: document.getElementById('raceName').value.trim(),
+        circuitId: document.getElementById('circuitId').value.trim(),
+        circuitName: document.getElementById('circuitName').value.trim(),
+        date: document.getElementById('date').value,
+        hasSprint: document.getElementById('hasSprint').checked
+    };
+    if (!payload.year || !payload.round || !payload.raceName) {
+        setStatus('raceStatus', '年份、回合、比赛名称为必填项', false);
+        return;
+    }
+    try {
+        await api('/api/admin', { method: 'POST', body: JSON.stringify(payload) });
+        setStatus('raceStatus', '覆盖已保存', true);
+        clearForm();
+        await loadRaces();
+    } catch (err) {
+        setStatus('raceStatus', err.message, false);
+    }
+}
+
+async function deleteRace(race) {
+    if (!confirm('删除第 ' + race.round + ' 回合的覆盖？')) return;
+    try {
+        await api('/api/admin', {
+            method: 'DELETE',
+            body: JSON.stringify({ year: document.getElementById('year').value.trim(), round: race.round })
+        });
+        setStatus('raceStatus', '已删除', true);
+        await loadRaces();
+    } catch (err) {
+        setStatus('raceStatus', err.message, false);
+    }
+}
+
+async function loadBans() {
+    const data = await api('/api/ban');
+    const tbody = document.getElementById('banTable');
+    tbody.innerHTML = '';
+    data.bans.forEach(b => {
+        const tr = document.createElement('tr');
+        const ipTd = document.createElement('td');
+        ipTd.textContent = b.ip;
+        tr.appendChild(ipTd);
+        const timeTd = document.createElement('td');
+        timeTd.textContent = b.bannedAt ? new Date(Number(b.bannedAt)).toLocaleString() : '';
+        tr.appendChild(timeTd);
+        const opTd = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.className = 'danger';
+        btn.textContent = '解封';
+        btn.addEventListener('click', () => unban(b.ip));
+        opTd.appendChild(btn);
+        tr.appendChild(opTd);
+        tbody.appendChild(tr);
+    });
+}
+
+async function unban(ip) {
+    if (!confirm('解封 ' + ip + '？')) return;
+    try {
+        await api('/api/ban', { method: 'DELETE', body: JSON.stringify({ ip }) });
+        setStatus('banStatus', '已解封 ' + ip, true);
+        await loadBans();
+    } catch (err) {
+        setStatus('banStatus', err.message, false);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (sessionStorage.getItem(TOKEN_KEY)) showMain();
+});
+</script>
+</body>
+</html>
