@@ -147,6 +147,12 @@ export async function onRequestOptions() {
     });
 }
 
+// GET 请求：聊天接口只接受 POST。返回 405 JSON，
+// 这样直接在浏览器打开 /api/chat 就能确认函数已部署（返回 JSON 而非网页）。
+export async function onRequestGet() {
+    return json({ error: 'Method Not Allowed. Use POST to send a chat message.' }, 405);
+}
+
 // ---- 滥用检测：同一 IP 访问过频 -> 永久封禁 ----
 async function checkAndMaybeBan(env, request) {
     const info = { active: false, ip: 'unknown', minuteCount: 0, spikeCount: 0 };
