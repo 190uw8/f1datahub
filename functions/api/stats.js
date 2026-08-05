@@ -3,6 +3,9 @@
 //   GET  /api/stats  -> 今日 + 最近 14 天 + 汇总（需登录令牌）
 //   POST /api/stats  -> 页面访问探针（公开，无需令牌，只计数）
 //
+// 注意：本文件只导出统一的 onRequest，Cloudflare 会把任何请求方法
+// 都交给它处理，因此不会再出现 "405 Method Not Allowed"。
+//
 // KV 绑定：KV
 
 // ---- 统计辅助（内联，避免 Pages 把共享文件当路由编译）----
@@ -22,60 +25,69 @@ async function bumpStat(env, field) {
     } catch (e) {}
 }
 
-export async function onRequestGet(context) {
-    if (!(await verifyToken(context.env, context.request))) {
-        return json({ error: 'Unauthorized' }, 401);
+const CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400'
+};
+
+// 统一入口：任何请求方法都会走到这里
+export async function onRequest(context) {
+    const method = (context.request.method || 'GET').toUpperCase();
+
+    // 跨域预检
+    if (method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
-    const days = [];
-    const totals = { visits: 0, apiRequests: 0, chatRequests: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-
-    for (let i = 13; i >= 0; i--) {
-        const d = new Date(Date.now() - i * 86400000);
-        const key = `stats:day:${dayKey(d)}`;
-        let s = {};
-        try {
-            s = JSON.parse((await context.env.KV.get(key)) || '{}');
-        } catch (e) {
-            s = {};
-        }
-        const row = {
-            date: key.replace('stats:day:', ''),
-            visits: s.visits || 0,
-            apiRequests: s.apiRequests || 0,
-            chatRequests: s.chatRequests || 0,
-            promptTokens: s.promptTokens || 0,
-            completionTokens: s.completionTokens || 0,
-            totalTokens: s.totalTokens || 0
-        };
-        days.push(row);
-        totals.visits += row.visits;
-        totals.apiRequests += row.apiRequests;
-        totals.chatRequests += row.chatRequests;
-        totals.promptTokens += row.promptTokens;
-        totals.completionTokens += row.completionTokens;
-        totals.totalTokens += row.totalTokens;
+    // 页面访问探针：公开，无需令牌
+    if (method === 'POST') {
+        await bumpStat(context.env, 'visits');
+        return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
-    return json({ today: days[days.length - 1], days, totals }, 200);
-}
-
-// 公开探针：统计一次页面访问
-export async function onRequestPost(context) {
-    await bumpStat(context.env, 'visits');
-    return new Response(null, { status: 204 });
-}
-
-export async function onRequestOptions() {
-    return new Response(null, {
-        status: 204,
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-            'Access-Control-Max-Age': '86400'
+    // 统计查询：需要登录令牌
+    if (method === 'GET') {
+        if (!(await verifyToken(context.env, context.request))) {
+            return json({ error: 'Unauthorized' }, 401);
         }
-    });
+
+        const days = [];
+        const totals = { visits: 0, apiRequests: 0, chatRequests: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+
+        for (let i = 13; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 86400000);
+            const key = `stats:day:${dayKey(d)}`;
+            let s = {};
+            try {
+                s = JSON.parse((await context.env.KV.get(key)) || '{}');
+            } catch (e) {
+                s = {};
+            }
+            const row = {
+                date: key.replace('stats:day:', ''),
+                visits: s.visits || 0,
+                apiRequests: s.apiRequests || 0,
+                chatRequests: s.chatRequests || 0,
+                promptTokens: s.promptTokens || 0,
+                completionTokens: s.completionTokens || 0,
+                totalTokens: s.totalTokens || 0
+            };
+            days.push(row);
+            totals.visits += row.visits;
+            totals.apiRequests += row.apiRequests;
+            totals.chatRequests += row.chatRequests;
+            totals.promptTokens += row.promptTokens;
+            totals.completionTokens += row.completionTokens;
+            totals.totalTokens += row.totalTokens;
+        }
+
+        return json({ today: days[days.length - 1], days, totals }, 200);
+    }
+
+    // 其他方法：明确拒绝，但保留 CORS 头方便排查
+    return json({ error: 'Method not allowed' }, 405, CORS_HEADERS);
 }
 
 // ---- 令牌校验（与 admin.js / ban.js 相同）----
@@ -113,12 +125,12 @@ function safeEqual(a, b) {
     return diff === 0;
 }
 
-function json(obj, status) {
+function json(obj, status, extraHeaders) {
     return new Response(JSON.stringify(obj), {
         status,
-        headers: {
+        headers: Object.assign({
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*'
-        }
+        }, extraHeaders || {})
     });
 }
